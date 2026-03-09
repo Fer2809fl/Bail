@@ -31,8 +31,8 @@ Puedes instalarla de dos formas, ambas funcionan igual:
 
 ```bash
 # Con el paquete de este repo
-npm install @Fer280809/Baileys
-yarn add @Fer280809/Baileys
+npm install @fer280809/Baileys
+yarn add @fer280809/Baileys
 
 # Con el paquete original de whiskeysockets
 npm install @whiskeysockets/baileys
