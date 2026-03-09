@@ -47,7 +47,7 @@ npm install @whiskeysockets/baileys
 yarn add @whiskeysockets/baileys
 ```
 
-**Opción 4 — En tu package.json** (elige una de estas formas):
+**Opción — En tu package.json** (elige una de estas formas):
 ```json
 {
   "dependencies": {
