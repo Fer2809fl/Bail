@@ -27,20 +27,40 @@
 
 ## 📦 Instalación
 
-Puedes instalarla de dos formas, ambas funcionan igual:
+Puedes instalarla de varias formas, todas funcionan igual:
 
+**Opción 1 — Desde npm (recomendado)**
 ```bash
-# Desde npm
 npm install @fer2809fl/baileys
 yarn add @fer2809fl/baileys
+```
 
-# También funciona con el paquete original
-npm install @whiskeysockets/baileys
-yarn add @whiskeysockets/baileys
-
-# Versión de desarrollo (última del repo)
+**Opción 2 — Desde GitHub directamente**
+```bash
 npm install github:Fer2809fl/Baileys
 yarn add github:Fer2809fl/Baileys
+```
+
+**Opción 3 — También funciona con el paquete original**
+```bash
+npm install @whiskeysockets/baileys
+yarn add @whiskeysockets/baileys
+```
+
+**Opción 4 — En tu package.json** (elige una de estas formas):
+```json
+{
+  "dependencies": {
+    "@fer2809fl/baileys": "^1.4.5"
+  }
+}
+```
+```json
+{
+  "dependencies": {
+    "@whiskeysockets/baileys": "github:Fer2809fl/Baileys"
+  }
+}
 ```
 
 ---
