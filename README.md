@@ -16,6 +16,22 @@
 
 ---
 
+## 🆕 Novedades — v1.8.9
+
+### ✅ Nuevas funciones añadidas
+- **Botones interactivos** — Se agregaron funciones nativas para enviar botones de WhatsApp:
+  - `sendCopyButton` — Botón que copia texto al portapapeles
+  - `sendUrlButton` — Botón que abre un enlace en el navegador
+  - `sendQuickReplyButtons` — Botones de respuesta rápida
+  - `sendCallButton` — Botón para iniciar una llamada telefónica
+  - `sendListMenu` — Menú desplegable con secciones y filas
+  - `sendInteractiveMessage` — Combinación de botones mixtos (URL + Copiar + Rápido)
+
+### 🐛 Correcciones
+- **Error en macOS** — Se reparó un bug crítico que impedía iniciar sesión correctamente en dispositivos Mac. El proceso de pairing/QR ahora funciona de forma estable en macOS.
+
+---
+
 ## ⚠️ Nota Importante
 
 ꕤ Esta librería está basada en Baileys. No está afiliada ni aprobada oficialmente por WhatsApp.
@@ -51,7 +67,7 @@ yarn add @whiskeysockets/baileys
 ```json
 {
   "dependencies": {
-    "@fer2809fl/baileys": "^1.4.5"
+    "@fer2809fl/baileys": "^1.8.9"
   }
 }
 ```
@@ -144,7 +160,7 @@ startBot()
 - 📸 Mensajes multimedia (imágenes, video, audio, documentos)
 - 🤖 Comandos personalizados fáciles de implementar
 - 👥 Soporte para grupos y chats privados
-- 🔘 Mensajes interactivos con botones y listas
+- 🔘 **Mensajes interactivos con botones, listas y más** *(nuevo en v1.8.9)*
 
 ### Técnicas
 - ⚡ Sin Selenium — Conexión directa vía WebSocket
@@ -154,6 +170,289 @@ startBot()
 - 🔄 Reconexión automática ante desconexiones
 - 🔐 Sesiones persistentes guardadas localmente
 - 🌐 API completa de WhatsApp Web
+- 🍎 **Compatible con macOS** — Error de pairing reparado *(fix en v1.8.9)*
+
+---
+
+## 🔘 Botones Interactivos *(nuevo en v1.8.9)*
+
+Desde la versión **1.8.9** puedes importar y usar funciones nativas para enviar botones interactivos de WhatsApp.
+
+### Importar las funciones
+
+```javascript
+// JavaScript (CommonJS)
+const {
+    sendCopyButton,
+    sendUrlButton,
+    sendQuickReplyButtons,
+    sendCallButton,
+    sendListMenu,
+    sendInteractiveMessage
+} = require('@fer2809fl/baileys')
+```
+
+```typescript
+// TypeScript / ESM
+import {
+    sendCopyButton,
+    sendUrlButton,
+    sendQuickReplyButtons,
+    sendCallButton,
+    sendListMenu,
+    sendInteractiveMessage
+} from '@fer2809fl/baileys'
+```
+
+---
+
+### 📋 `sendCopyButton` — Botón Copiar
+Muestra un botón que al tocarlo copia un texto al portapapeles del usuario.
+
+```javascript
+await sendCopyButton(
+    conn,
+    jid,
+    '📋 *CÓDIGO DE INSTALACIÓN*\n\nEjecuta este comando en tu terminal:',
+    'npm install asta-bot',   // texto que se copiará
+    '📋 Copiar Comando'       // etiqueta del botón
+)
+```
+
+---
+
+### 🔗 `sendUrlButton` — Botón URL
+Abre un enlace en el navegador al tocar el botón.
+
+```javascript
+await sendUrlButton(
+    conn,
+    jid,
+    '🔗 *ENLACES IMPORTANTES*\n\nVisita nuestro repositorio oficial:',
+    'https://github.com/Fer2809fl/Asta_bot',  // URL de destino
+    '🌐 Ver GitHub'                            // etiqueta del botón
+)
+```
+
+---
+
+### ⚡ `sendQuickReplyButtons` — Botones de Respuesta Rápida
+Muestra varios botones de respuesta rápida debajo del mensaje.
+
+```javascript
+await sendQuickReplyButtons(
+    conn,
+    jid,
+    '🎮 *MENÚ DE OPCIONES*\n\n¿Qué deseas hacer?',
+    [
+        { id: 'menu',  text: '📋 Ver Menú'    },
+        { id: 'info',  text: 'ℹ️ Información' },
+        { id: 'owner', text: '👑 Owner'       }
+    ]
+)
+```
+
+---
+
+### 📞 `sendCallButton` — Botón de Llamada
+Inicia una llamada al número indicado al tocar el botón.
+
+```javascript
+await sendCallButton(
+    conn,
+    jid,
+    '📞 *SOPORTE TÉCNICO*\n\n¿Necesitas ayuda? Llámanos:',
+    '+5214183357841',  // número de teléfono
+    '📞 Llamar Ahora'  // etiqueta del botón
+)
+```
+
+---
+
+### 📋 `sendListMenu` — Menú Desplegable (Lista)
+Muestra un menú con secciones y opciones seleccionables.
+
+```javascript
+await sendListMenu(
+    conn,
+    jid,
+    '📋 *SELECCIONA UNA OPCIÓN*',
+    'Menú Principal',  // título del botón que abre la lista
+    [
+        {
+            title: '📱 COMANDOS BÁSICOS',
+            rows: [
+                { id: '#menu',  title: '📋 Menú',  description: 'Ver todos los comandos' },
+                { id: '#ping',  title: '🏓 Ping',  description: 'Ver latencia del bot'   },
+                { id: '#owner', title: '👑 Owner', description: 'Info del creador'       }
+            ]
+        },
+        {
+            title: '🎮 COMANDOS DE GRUPO',
+            rows: [
+                { id: '#add',     title: '➕ Agregar', description: 'Agregar usuario al grupo'  },
+                { id: '#kick',    title: '👢 Expulsar', description: 'Expulsar usuario del grupo' },
+                { id: '#promote', title: '⭐ Promover', description: 'Dar admin a un usuario'   }
+            ]
+        },
+        {
+            title: '🔧 CONFIGURACIÓN',
+            rows: [
+                { id: '#sinprefix', title: '⚙️ Sin Prefijo', description: 'Activar/desactivar prefijo' },
+                { id: '#antilink', title: '🔗 Anti Link',    description: 'Bloquear enlaces'           }
+            ]
+        }
+    ]
+)
+```
+
+---
+
+### 🎯 `sendInteractiveMessage` — Múltiples Botones Mixtos
+Combina distintos tipos de botones en un solo mensaje.
+
+```javascript
+await sendInteractiveMessage(
+    conn,
+    jid,
+    '🎯 *PANEL DE CONTROL*\n\nSelecciona una acción rápida:',
+    [
+        { type: 'url',   text: '🌐 GitHub',        value: 'https://github.com/Fer2809fl/Asta_bot' },
+        { type: 'copy',  text: '📋 Comando Inicio', value: 'npm start'                             },
+        { type: 'quick', text: '📋 Ver Menú',       value: 'menu'                                  }
+    ]
+)
+```
+
+---
+
+### Plugin de ejemplo completo
+
+Aquí un plugin listo para usar en tu bot con todos los tipos de botones:
+
+```javascript
+// plugins/botones.js
+import { 
+    sendCopyButton,
+    sendUrlButton,
+    sendQuickReplyButtons,
+    sendCallButton,
+    sendListMenu,
+    sendInteractiveMessage
+} from '@fer2809fl/baileys'
+
+let handler = async (m, { conn, usedPrefix }) => {
+
+    // #boton1 — Botón Copiar
+    if (m.text === `${usedPrefix}boton1`) {
+        await sendCopyButton(conn, m.chat,
+            '📋 *CÓDIGO DE INSTALACIÓN*\n\nEjecuta este comando en tu terminal:',
+            'npm install asta-bot',
+            '📋 Copiar Comando'
+        )
+    }
+
+    // #boton2 — Botón URL
+    else if (m.text === `${usedPrefix}boton2`) {
+        await sendUrlButton(conn, m.chat,
+            '🔗 *ENLACES IMPORTANTES*\n\nVisita nuestro repositorio oficial:',
+            'https://github.com/Fer2809fl/Asta_bot',
+            '🌐 Ver GitHub'
+        )
+    }
+
+    // #boton3 — Botones de Respuesta Rápida
+    else if (m.text === `${usedPrefix}boton3`) {
+        await sendQuickReplyButtons(conn, m.chat,
+            '🎮 *MENÚ DE OPCIONES*\n\n¿Qué deseas hacer?',
+            [
+                { id: 'menu',  text: '📋 Ver Menú'    },
+                { id: 'info',  text: 'ℹ️ Información' },
+                { id: 'owner', text: '👑 Owner'       }
+            ]
+        )
+    }
+
+    // #boton4 — Botón de Llamada
+    else if (m.text === `${usedPrefix}boton4`) {
+        await sendCallButton(conn, m.chat,
+            '📞 *SOPORTE TÉCNICO*\n\n¿Necesitas ayuda? Llámanos:',
+            '+5214183357841',
+            '📞 Llamar Ahora'
+        )
+    }
+
+    // #boton5 — Lista Desplegable
+    else if (m.text === `${usedPrefix}boton5`) {
+        await sendListMenu(conn, m.chat,
+            '📋 *SELECCIONA UNA OPCIÓN*',
+            'Menú Principal',
+            [
+                {
+                    title: '📱 COMANDOS BÁSICOS',
+                    rows: [
+                        { id: '#menu',  title: '📋 Menú',  description: 'Ver todos los comandos' },
+                        { id: '#ping',  title: '🏓 Ping',  description: 'Ver latencia del bot'   },
+                        { id: '#owner', title: '👑 Owner', description: 'Info del creador'       }
+                    ]
+                },
+                {
+                    title: '🎮 COMANDOS DE GRUPO',
+                    rows: [
+                        { id: '#add',     title: '➕ Agregar', description: 'Agregar usuario al grupo'    },
+                        { id: '#kick',    title: '👢 Expulsar', description: 'Expulsar usuario del grupo' },
+                        { id: '#promote', title: '⭐ Promover', description: 'Dar admin a un usuario'    }
+                    ]
+                },
+                {
+                    title: '🔧 CONFIGURACIÓN',
+                    rows: [
+                        { id: '#sinprefix', title: '⚙️ Sin Prefijo', description: 'Activar/desactivar prefijo' },
+                        { id: '#antilink',  title: '🔗 Anti Link',   description: 'Bloquear enlaces'           }
+                    ]
+                }
+            ]
+        )
+    }
+
+    // #boton6 — Botones Mixtos
+    else if (m.text === `${usedPrefix}boton6`) {
+        await sendInteractiveMessage(conn, m.chat,
+            '🎯 *PANEL DE CONTROL*\n\nSelecciona una acción rápida:',
+            [
+                { type: 'url',   text: '🌐 GitHub',        value: 'https://github.com/Fer2809fl/Asta_bot' },
+                { type: 'copy',  text: '📋 Comando Inicio', value: 'npm start'                             },
+                { type: 'quick', text: '📋 Ver Menú',       value: 'menu'                                  }
+            ]
+        )
+    }
+
+    // #botones — Ayuda
+    else if (m.text === `${usedPrefix}botones`) {
+        await conn.reply(m.chat,
+            `🧪 *COMANDOS DE PRUEBA - BOTONES INTERACTIVOS*\n\n` +
+            `┌✦ *BOTÓN COPIAR*\n` +
+            `│ ${usedPrefix}boton1 - Botón que copia texto\n│\n` +
+            `├✦ *BOTÓN URL*\n` +
+            `│ ${usedPrefix}boton2 - Botón que abre enlace\n│\n` +
+            `├✦ *BOTONES RÁPIDOS*\n` +
+            `│ ${usedPrefix}boton3 - Botones de respuesta\n│\n` +
+            `├✦ *BOTÓN LLAMADA*\n` +
+            `│ ${usedPrefix}boton4 - Botón para llamar\n│\n` +
+            `├✦ *LISTA DESPLEGABLE*\n` +
+            `│ ${usedPrefix}boton5 - Menú con opciones\n│\n` +
+            `└✦ *MÚLTIPLES BOTONES*\n` +
+            `  ${usedPrefix}boton6 - Combinación de botones\n\n` +
+            `✨ *Prueba cada uno y mira cómo funcionan!*`, m)
+    }
+}
+
+handler.command = ['boton1', 'boton2', 'boton3', 'boton4', 'boton5', 'boton6', 'botones']
+handler.help    = ['boton1', 'boton2', 'boton3', 'boton4', 'boton5', 'boton6', 'botones']
+handler.tags    = ['test']
+
+export default handler
+```
 
 ---
 
@@ -245,19 +544,9 @@ melody.ev.on('messages.upsert', async ({ messages }) => {
                 text: '¡Hola! Soy Delta, ¿en qué puedo ayudarte?'
             })
             break
-
         case 'ping':
-            await melody.sendMessage(m.key.remoteJid, {
-                text: '🏓 Pong!'
-            })
+            await melody.sendMessage(m.key.remoteJid, { text: '🏓 Pong!' })
             break
-
-        case 'stickers':
-            await melody.sendMessage(m.key.remoteJid, {
-                text: '¡Aquí tienes stickers lindos!'
-            })
-            break
-
         default:
             await melody.sendMessage(m.key.remoteJid, {
                 text: `Comando desconocido: ${cmd}`
@@ -266,44 +555,10 @@ melody.ev.on('messages.upsert', async ({ messages }) => {
 })
 ```
 
-### TypeScript
-```typescript
-melody.ev.on('messages.upsert', async ({ messages }) => {
-    const m = messages[0]
-    const body: string = m.message?.conversation
-        ?? m.message?.extendedTextMessage?.text
-        ?? ''
-
-    const prefix = '!'
-    if (!body.startsWith(prefix)) return
-
-    const [cmd, ...args]: string[] = body.slice(prefix.length).trim().split(' ')
-
-    const commands: Record<string, () => Promise<void>> = {
-        hola: async () => {
-            await melody.sendMessage(m.key.remoteJid!, {
-                text: '¡Hola! Soy My Melody, ¿en qué puedo ayudarte?'
-            })
-        },
-        ping: async () => {
-            await melody.sendMessage(m.key.remoteJid!, { text: '🏓 Pong!' })
-        },
-        info: async () => {
-            await melody.sendMessage(m.key.remoteJid!, {
-                text: `📌 JID: ${m.key.remoteJid}\n👤 Sender: ${m.key.participant ?? m.key.remoteJid}`
-            })
-        }
-    }
-
-    await commands[cmd.toLowerCase()]?.()
-})
-```
-
 ---
 
 ## ⚙️ Configuración Avanzada
 
-### JavaScript
 ```javascript
 const melody = makeWASocket({
     auth: state,
@@ -311,21 +566,6 @@ const melody = makeWASocket({
     markOnlineOnConnect: false,
     browser: ["Delta", "Chrome", "1.0.0"],
     logger: require('pino')({ level: 'silent' }),
-    syncFullHistory: false,
-    generateHighQualityLinkPreview: true
-})
-```
-
-### TypeScript
-```typescript
-import pino from 'pino'
-
-const melody = makeWASocket({
-    auth: state,
-    printQRInTerminal: true,
-    markOnlineOnConnect: false,
-    browser: ["Delta", "Chrome", "1.0.0"] as [string, string, string],
-    logger: pino({ level: 'silent' }),
     syncFullHistory: false,
     generateHighQualityLinkPreview: true
 })
@@ -376,35 +616,6 @@ await melody.sendMessage(jid, {
 
 ---
 
-## 📘 TypeScript — Tipos Personalizados
-
-```typescript
-import makeWASocket, { WASocket, proto } from '@fer2809fl/baileys'
-
-// Tipo para un mensaje con datos del remitente
-type MessageWithSender = proto.IWebMessageInfo & {
-    senderName?: string
-    isGroup?: boolean
-}
-
-// Función tipada para procesar mensajes
-async function processMessage(
-    sock: WASocket,
-    msg: MessageWithSender
-): Promise<void> {
-    const jid = msg.key.remoteJid!
-    const text = msg.message?.conversation ?? ''
-
-    if (text === '!tipo') {
-        await sock.sendMessage(jid, {
-            text: `Tipo de chat: ${msg.isGroup ? 'Grupo' : 'Privado'}`
-        })
-    }
-}
-```
-
----
-
 ## 📁 Estructura Recomendada del Proyecto
 
 ```
@@ -414,7 +625,8 @@ mi-bot/
 ├── commands/
 │   ├── hola.js
 │   ├── ping.js
-│   └── stickers.js
+│   ├── stickers.js
+│   └── botones.js    
 ├── events/
 │   ├── messages.js
 │   └── connection.js
@@ -422,6 +634,15 @@ mi-bot/
 │   └── helpers.js
 └── session-mymelody/ # Sesión guardada automáticamente
 ```
+
+---
+
+## 📝 Historial de Versiones
+
+| Versión | Cambios |
+|---------|---------|
+| **1.8.9** | ✅ Botones interactivos (`sendCopyButton`, `sendUrlButton`, `sendQuickReplyButtons`, `sendCallButton`, `sendListMenu`, `sendInteractiveMessage`) — 🐛 Fix error de pairing en macOS |
+| 1.4.5 | Versión estable anterior |
 
 ---
 
