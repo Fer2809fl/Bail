@@ -762,9 +762,7 @@ export const makeSocket = (config: SocketConfig) => {
 	}
 
 	const requestPairingCode = async (phoneNumber: string, customPairingCode?: string): Promise<string> => {
-		// Por defecto usamos el código de marca "ASTABOTS" (8 caracteres) en vez de uno aleatorio,
-		// salvo que el llamador pase explícitamente su propio customPairingCode.
-		const pairingCode = customPairingCode ?? 'ASTABOTS'
+		const pairingCode = customPairingCode ?? bytesToCrockford(randomBytes(5))
 
 		if (customPairingCode && customPairingCode?.length !== 8) {
 			throw new Error('Custom pairing code must be exactly 8 chars')
