@@ -1602,7 +1602,7 @@ export const toJid = (id: string | undefined | null): string => {
 
 /** Obtiene el JID y el LID del remitente de un mensaje */
 export const getSenderLid = (message: proto.IWebMessageInfo) => {
-	const sender = message.key.participant || message.key.remoteJid
+	const sender = message.key?.participant || message.key?.remoteJid
 	const user = jidDecode(sender!)?.user || ''
 	const lid = jidEncode(user, 'lid')
 	return { jid: sender, lid }
