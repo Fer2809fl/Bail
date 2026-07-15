@@ -1712,9 +1712,16 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 					delete (content as { ai?: boolean }).ai
 				}
 
-				const buttonType = getButtonType(fullMsg.message!)
+				// normalizeMessageContent desenvuelve capas como viewOnceMessage/ephemeralMessage:
+				// los botones (interactiveMessage) casi siempre se envían envueltos en
+				// viewOnceMessage por compatibilidad Multi-Device, así que hay que revisar
+				// el contenido ya desenvuelto o nunca se detecta el tipo de botón y WhatsApp
+				// nunca recibe el nodo binario (biz/interactive/native_flow) que necesita
+				// para renderizarlos.
+				const buttonCheckMessage = normalizeMessageContent(fullMsg.message!) || fullMsg.message!
+				const buttonType = getButtonType(buttonCheckMessage)
 				if (buttonType) {
-					const btnNode = getButtonArgs(fullMsg.message!)
+					const btnNode = getButtonArgs(buttonCheckMessage)
 					if (btnNode) additionalNodes.push(btnNode)
 				}
 
