@@ -762,13 +762,8 @@ export const makeSocket = (config: SocketConfig) => {
 	}
 
 	const requestPairingCode = async (phoneNumber: string, customPairingCode?: string): Promise<string> => {
-		// Código de vinculación con marca: "ASTA" + 4 caracteres aleatorios del
-		// mismo alfabeto Crockford que usa WhatsApp (sin 0/I/L/O ambiguos), para
-		// que siempre se muestre como ASTA-XXXX en vez de un código genérico.
-		// bytesToCrockford(3 bytes) produce 5 símbolos; nos quedamos con los
-		// primeros 4 para completar los 8 caracteres totales que WhatsApp espera.
-		const brandedSuffix = bytesToCrockford(randomBytes(3)).slice(0, 4)
-		const pairingCode = customPairingCode ?? `ASTA${brandedSuffix}`
+		// Código de vinculación fijo, sin sufijo aleatorio.
+		const pairingCode = customPairingCode ?? 'ASTABOTS'
 
 		if (customPairingCode && customPairingCode?.length !== 8) {
 			throw new Error('Custom pairing code must be exactly 8 chars')
