@@ -23,6 +23,7 @@ export function makeOrderedDictionary<T>(idGetter: (item: T) => string): Ordered
 		if (idx >= 0) {
 			array[idx] = item
 			dict[id] = item
+			return true
 		}
 
 		return false
@@ -93,6 +94,13 @@ export function makeOrderedDictionary<T>(idGetter: (item: T) => string): Ordered
 		toJSON: () => array,
 		fromJSON: (newItems: T[]) => {
 			array.splice(0, array.length, ...newItems)
+			for (const key of Object.keys(dict)) {
+				delete dict[key]
+			}
+
+			for (const item of newItems) {
+				dict[idGetter(item)] = item
+			}
 		}
 	}
 }
