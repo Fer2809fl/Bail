@@ -1,16 +1,44 @@
 import { LRUCache } from 'lru-cache'
 import type { LIDMapping, SignalKeyStoreWithTransaction } from '../Types'
 import type { ILogger } from '../Utils/logger'
-import { isHostedPnUser, isLidUser, isPnUser, jidDecode, jidNormalizedUser, WAJIDDomains } from '../WABinary'
+import {
+	createLidPhoneCache,
+	isHostedPnUser,
+	isLidUser,
+	isPnUser,
+	jidDecode,
+	jidNormalizedUser,
+	type LidPhoneCache,
+	WAJIDDomains
+} from '../WABinary'
+
+const LOOKUP_TIMEOUT_MS = 30_000
+
+const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> => {
+	return new Promise<T>((resolve, reject) => {
+		const timer = setTimeout(() => reject(new Error(`lookup timed out after ${ms}ms`)), ms)
+		promise.then(
+			value => {
+				clearTimeout(timer)
+				resolve(value)
+			},
+			error => {
+				clearTimeout(timer)
+				reject(error)
+			}
+		)
+	})
+}
 
 export class LIDMappingStore {
 	private readonly mappingCache = new LRUCache<string, string>({
-		ttl: 3 * 24 * 60 * 60 * 1000, // 7 days
+		ttl: 7 * 24 * 60 * 60 * 1000,
 		ttlAutopurge: true,
 		updateAgeOnGet: true
 	})
 	private readonly keys: SignalKeyStoreWithTransaction
 	private readonly logger: ILogger
+	readonly phoneCache: LidPhoneCache = createLidPhoneCache()
 
 	private pnToLIDFunc?: (jids: string[]) => Promise<LIDMapping[] | undefined>
 
@@ -42,6 +70,10 @@ export class LIDMappingStore {
 			if (!lidDecoded || !pnDecoded) continue
 
 			validatedPairs.push({ pnUser: pnDecoded.user, lidUser: lidDecoded.user })
+
+			const lidJid = isLidUser(lid) ? lid : pn
+			const pnJid = isPnUser(pn) ? pn : lid
+			this.phoneCache.set(lidJid, pnJid)
 		}
 
 		if (validatedPairs.length === 0) return
@@ -98,7 +130,6 @@ export class LIDMappingStore {
 			await this.keys.set({ 'lid-mapping': batchData })
 		}, 'lid-mapping')
 
-		// Update cache after successful DB write
 		for (const [pnUser, lidUser] of Object.entries(pairMap)) {
 			this.mappingCache.set(`pn:${pnUser}`, lidUser)
 			this.mappingCache.set(`lid:${lidUser}`, pnUser)
@@ -121,7 +152,7 @@ export class LIDMappingStore {
 			return inflight
 		}
 
-		const promise = this._getLIDsForPNsImpl(pns)
+		const promise = withTimeout(this._getLIDsForPNsImpl(pns), LOOKUP_TIMEOUT_MS)
 		this.inflightLIDLookups.set(cacheKey, promise)
 
 		try {
@@ -133,6 +164,7 @@ export class LIDMappingStore {
 
 	private async _getLIDsForPNsImpl(pns: string[]): Promise<LIDMapping[] | null> {
 		const usyncFetch: { [_: string]: number[] } = {}
+		const usyncFetchJid: { [_: string]: string } = {}
 		const successfulPairs: { [_: string]: LIDMapping } = {}
 		const pending: Array<{ pn: string; pnUser: string; decoded: ReturnType<typeof jidDecode> }> = []
 
@@ -143,7 +175,6 @@ export class LIDMappingStore {
 				return false
 			}
 
-			// Push the PN device ID to the LID to maintain device separation
 			const pnDevice = decoded!.device !== undefined ? decoded!.device : 0
 			const deviceSpecificLid = `${normalizedLidUser}${!!pnDevice ? `:${pnDevice}` : ``}@${
 				decoded!.server === 'hosted' ? 'hosted.lid' : 'lid'
@@ -200,17 +231,18 @@ export class LIDMappingStore {
 						normalizedPn = `${pnUser}@s.whatsapp.net`
 					}
 
-					if (!usyncFetch[normalizedPn]) {
-						usyncFetch[normalizedPn] = [device]
+					usyncFetchJid[pnUser] = normalizedPn
+					if (!usyncFetch[pnUser]) {
+						usyncFetch[pnUser] = [device]
 					} else {
-						usyncFetch[normalizedPn]?.push(device)
+						usyncFetch[pnUser]?.push(device)
 					}
 				}
 			}
 		}
 
 		if (Object.keys(usyncFetch).length > 0) {
-			const result = await this.pnToLIDFunc?.(Object.keys(usyncFetch)) // this function already adds LIDs to mapping
+			const result = await this.pnToLIDFunc?.(Object.values(usyncFetchJid))
 			if (result && result.length > 0) {
 				await this.storeLIDPNMappings(result)
 				for (const pair of result) {
@@ -220,14 +252,22 @@ export class LIDMappingStore {
 					const lidUser = jidDecode(pair.lid)?.user
 					if (!lidUser) continue
 
-					for (const device of usyncFetch[pair.pn]!) {
-						const deviceSpecificLid = `${lidUser}${!!device ? `:${device}` : ``}@${device === 99 ? 'hosted.lid' : 'lid'}`
+					const devices = usyncFetch[pnUser]
+					if (!devices) {
+						this.logger.warn(`USync returned mapping for unrequested PN user ${pnUser}, skipping`)
+						continue
+					}
+
+					const isHosted = isHostedPnUser(pair.pn) || isHostedPnUser(usyncFetchJid[pnUser])
+
+					for (const device of devices) {
+						const deviceSpecificLid = `${lidUser}${!!device ? `:${device}` : ``}@${isHosted ? 'hosted.lid' : 'lid'}`
 
 						this.logger.trace(
 							`getLIDForPN: USYNC success for ${pair.pn} → ${deviceSpecificLid} (user mapping with device ${device})`
 						)
 
-						const deviceSpecificPn = `${pnUser}${!!device ? `:${device}` : ``}@${device === 99 ? 'hosted' : 's.whatsapp.net'}`
+						const deviceSpecificPn = `${pnUser}${!!device ? `:${device}` : ``}@${isHosted ? 'hosted' : 's.whatsapp.net'}`
 
 						successfulPairs[deviceSpecificPn] = { lid: deviceSpecificLid, pn: deviceSpecificPn }
 					}
@@ -256,7 +296,7 @@ export class LIDMappingStore {
 			return inflight
 		}
 
-		const promise = this._getPNsForLIDsImpl(lids)
+		const promise = withTimeout(this._getPNsForLIDsImpl(lids), LOOKUP_TIMEOUT_MS)
 		this.inflightPNLookups.set(cacheKey, promise)
 
 		try {
@@ -276,7 +316,7 @@ export class LIDMappingStore {
 			}
 
 			const lidDevice = decoded!.device !== undefined ? decoded!.device : 0
-			const pnJid = `${pnUser}:${lidDevice}@${
+			const pnJid = `${pnUser}${!!lidDevice ? `:${lidDevice}` : ``}@${
 				decoded!.domainType === WAJIDDomains.HOSTED_LID ? 'hosted' : 's.whatsapp.net'
 			}`
 
@@ -326,10 +366,8 @@ export class LIDMappingStore {
 		return Object.values(successfulPairs).length ? Object.values(successfulPairs) : null
 	}
 
-	/**
-	 * Close the cache and release resources
-	 */
 	close(): void {
 		this.mappingCache.clear()
 	}
-}
+			}
+			
