@@ -1,4 +1,4 @@
-import { Boom } from '@hapi/boom'
+import { Boom } from '@neykoor/boom'
 import { randomBytes } from 'crypto'
 import { proto } from '../../WAProto/index.js'
 import type { AuthenticationCreds } from '../Types'
@@ -20,12 +20,10 @@ import {
 	type ShortcakeCompanionEphemeralIdentity
 } from './shortcake-crypto'
 
-/** Signs the server's WebAuthn request options; the credential source stays outside the library. */
 export type ShortcakeAssertionSigner = (
 	requestOptions: Uint8Array
 ) => Promise<{ readonly credentialId: Uint8Array; readonly webauthnAssertion: Uint8Array }>
 
-/** HKDF info for the pairing handoff HMAC key (derived from the ADV secret). */
 const HANDOFF_KEY_INFO = 'shortcake-passkey-handoff-v1'
 const HANDOFF_KEY_TTL_MS = 5 * 60 * 1000
 
@@ -45,7 +43,6 @@ interface ShortcakeSession {
 	readonly companion: ShortcakeCompanionEphemeralIdentity
 	readonly ref: string
 	readonly deviceType: proto.DeviceProps.PlatformType
-	/** True when a pairing handoff proof was sent (server may skip the code-matching UX). */
 	readonly skipHandoffUx: boolean
 	stage: Stage
 	encryptionKey: Uint8Array | null
@@ -54,13 +51,10 @@ interface ShortcakeSession {
 
 export interface ShortcakeFlowOptions {
 	readonly logger: ILogger
-	/** Send an IQ and await its (error-free) result. */
 	readonly query: (node: BinaryNode, timeoutMs?: number) => Promise<BinaryNode>
 	readonly signAssertion: ShortcakeAssertionSigner
 	readonly getCreds: () => AuthenticationCreds
-	/** Persist a credentials patch (rotates the ADV secret on a prologue). */
 	readonly updateCreds: (patch: Partial<AuthenticationCreds>) => void
-	/** Companion platform reported in the ephemeral identity. */
 	readonly deviceType?: proto.DeviceProps.PlatformType
 	readonly emitVerificationCode?: (code: string) => void
 	readonly emitPrologueSent?: () => void
@@ -72,7 +66,6 @@ const mdIq = (type: 'get' | 'set', content: BinaryNode['content']): BinaryNode =
 	content
 })
 
-/** Drives the companion side of the "Shortcake" passkey-linking handshake (md IQ exchange + commit/reveal ECDH). */
 export const makeShortcakeFlow = (opts: ShortcakeFlowOptions) => {
 	let session: ShortcakeSession | null = null
 	let handoffKey: PasskeyHandoffKey | null = null
@@ -97,7 +90,6 @@ export const makeShortcakeFlow = (opts: ShortcakeFlowOptions) => {
 		return ref
 	}
 
-	/** Fetch options, sign (external), fetch ref, build the commitment, send the `passkey_prologue` IQ. */
 	const executePrologue = async (
 		args: {
 			readonly requestOptions?: Uint8Array
@@ -144,7 +136,6 @@ export const makeShortcakeFlow = (opts: ShortcakeFlowOptions) => {
 		opts.emitPrologueSent?.()
 	}
 
-	/** Derive a handoff HMAC key from the ADV secret and rotate it (matching the official clients). */
 	const stashHandoffKeyAndRotateAdv = (): void => {
 		const creds = opts.getCreds()
 		if (!creds?.advSecretKey) {
@@ -166,7 +157,6 @@ export const makeShortcakeFlow = (opts: ShortcakeFlowOptions) => {
 		return true
 	}
 
-	/** Build + AES-GCM seal the pairing request and send the `encrypted_pairing_request` IQ. */
 	const confirmVerificationCode = async (): Promise<void> => {
 		if (!session || session.stage !== Stage.WaitingForConfirmation || !session.encryptionKey) {
 			throw new Error('shortcake: no verification code awaiting confirmation')
@@ -222,7 +212,6 @@ export const makeShortcakeFlow = (opts: ShortcakeFlowOptions) => {
 		return true
 	}
 
-	/** Routes `passkey_prologue_request` / `crsc_continuation`; returns `true` when consumed. */
 	const handleIncomingNotification = async (node: BinaryNode): Promise<boolean> => {
 		if (node.attrs.type === 'passkey_prologue_request') {
 			return handlePasskeyPrologueRequest(node)
@@ -249,3 +238,5 @@ export const makeShortcakeFlow = (opts: ShortcakeFlowOptions) => {
 }
 
 export type ShortcakeFlow = ReturnType<typeof makeShortcakeFlow>
+
+			
