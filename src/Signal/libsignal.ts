@@ -1,7 +1,7 @@
 // @ts-ignore
 import * as libsignal from 'libsignal'
 // @ts-ignore
-import { PreKeyWhisperMessage } from 'libsignal/src/protobufs'
+import { PreKeyWhisperMessage } from 'libsignal/lib/protobufs.js'
 import { LRUCache } from 'lru-cache'
 import type { LIDMapping, SignalAuthState, SignalKeyStoreWithTransaction } from '../Types'
 import type { SignalRepositoryWithLIDStore } from '../Types/Signal'
@@ -47,6 +47,16 @@ function extractIdentityFromPkmsg(ciphertext: Uint8Array): Uint8Array | undefine
 	}
 }
 
+/**
+ * WhatsApp a veces entrega registrationId fuera del rango de 14 bits (0-16383)
+ * que libsignal exige en assertValidDeviceKeyBundle. El campo es solo una
+ * etiqueta de sesión (no se usa en cálculos criptográficos), así que es seguro
+ * acotarlo con una máscara de 14 bits antes de inyectar el bundle.
+ */
+function normalizeRegistrationId(id: number): number {
+	return (id & 0x3fff) || 1
+}
+
 export function makeLibSignalRepository(
 	auth: SignalAuthState,
 	logger: ILogger,
@@ -57,7 +67,7 @@ export function makeLibSignalRepository(
 
 	const parsedKeys = auth.keys as SignalKeyStoreWithTransaction
 	const migratedSessionCache = new LRUCache<string, true>({
-		ttl: 3 * 24 * 60 * 60 * 1000, // 7 days
+		ttl: 7 * 24 * 60 * 60 * 1000,
 		ttlAutopurge: true,
 		updateAgeOnGet: true
 	})
@@ -159,7 +169,7 @@ export function makeLibSignalRepository(
 			return parsedKeys.transaction(async () => {
 				const { type: sigType, body } = await cipher.encrypt(data)
 				const type = sigType === 3 ? 'pkmsg' : 'msg'
-				return { type, ciphertext: Buffer.from(body, 'binary') }
+				return { type, ciphertext: body }
 			}, jid)
 		},
 
@@ -206,6 +216,18 @@ export function makeLibSignalRepository(
 		async injectE2ESession({ jid, session }) {
 			logger.trace({ jid }, 'injecting E2EE session')
 			const cipher = new libsignal.SessionBuilder(storage, jidToSignalProtocolAddress(jid))
+			const device = session as unknown as { registrationId?: number } & Record<string, unknown>
+			if (typeof device.registrationId === 'number') {
+				const normalized = normalizeRegistrationId(device.registrationId)
+				if (normalized !== device.registrationId) {
+					logger.debug(
+						{ jid, original: device.registrationId, normalized },
+						'registrationId fuera de rango de 14 bits, normalizado'
+					)
+					device.registrationId = normalized
+				}
+			}
+
 			return parsedKeys.transaction(async () => {
 				// libsignal runtime accepts an absent prekey (initOutgoing checks `device.preKey && ...`)
 				// but the bundled .d.ts marks it required.
@@ -470,17 +492,17 @@ function signalStorage(
 					return libsignal.SessionRecord.deserialize(sess)
 				}
 			} catch (e) {
-				return null
+				return undefined
 			}
 
-			return null
+			return undefined
 		},
 		storeSession: async (id: string, session: libsignal.SessionRecord) => {
 			const wireJid = await resolveLIDSignalAddress(id)
 			await keys.set({ session: { [wireJid]: session.serialize() } })
 		},
-		isTrustedIdentity: () => {
-			return true // TOFU - Trust on First Use (same as WhatsApp Web)
+		isTrustedIdentity: (_id: string, _identityKey: Uint8Array, _direction: libsignal.Direction) => {
+			return true
 		},
 		loadIdentityKey: async (id: string) => {
 			const wireJid = await resolveLIDSignalAddress(id)
@@ -552,4 +574,5 @@ function signalStorage(
 			}
 		}
 	}
-}
+									 }
+					
