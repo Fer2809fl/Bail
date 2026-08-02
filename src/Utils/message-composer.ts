@@ -305,8 +305,8 @@ export const generateLatexContent = (
 	return { message: buildBotForwardedMessage(submessages, ctxInfo), messageId: generateMessageIDV2() }
 }
 
-type RenderLatexToPng = (expr: string) => Promise<{ buffer: Buffer; width: number; height: number }>
-type UploadFn = (buffer: Buffer, type: string) => Promise<{ url?: string; directPath?: string }>
+export type RenderLatexToPng = (expr: string) => Promise<{ buffer: Buffer; width: number; height: number }>
+export type UploadFn = (buffer: Buffer, type: string) => Promise<{ url?: string; directPath?: string }>
 
 export const generateLatexImageContent = async (
 	quoted: Quotable | undefined,
@@ -426,4 +426,5 @@ export const generateRichMessageContent = (
 ): RichMessageResult => {
 	const ctxInfo = buildRichContextInfo(quoted)
 	return { message: buildBotForwardedMessage(submessages, ctxInfo), messageId: generateMessageIDV2() }
-}
+								   }
+	
