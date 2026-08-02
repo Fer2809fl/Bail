@@ -1,4 +1,4 @@
-import { Boom } from '@hapi/boom'
+import { Boom } from '@neykoor/boom'
 import { proto } from '../../WAProto/index.js'
 import type {
 	AuthenticationCreds,
@@ -167,18 +167,25 @@ export const cleanMessage = (message: WAMessage, meId: string, meLid: string) =>
 	}
 }
 
-// TODO: target:audit AUDIT THIS FUNCTION AGAIN
 export const isRealMessage = (message: WAMessage) => {
+	if (
+		REAL_MSG_STUB_TYPES.has(message.messageStubType!) ||
+		REAL_MSG_REQ_ME_STUB_TYPES.has(message.messageStubType!)
+	) {
+		return true
+	}
+
 	const normalizedContent = normalizeMessageContent(message.message)
+	if (!normalizedContent) {
+		return false
+	}
+
 	const hasSomeContent = !!getContentType(normalizedContent)
 	return (
-		(!!normalizedContent ||
-			REAL_MSG_STUB_TYPES.has(message.messageStubType!) ||
-			REAL_MSG_REQ_ME_STUB_TYPES.has(message.messageStubType!)) &&
 		hasSomeContent &&
-		!normalizedContent?.protocolMessage &&
-		!normalizedContent?.reactionMessage &&
-		!normalizedContent?.pollUpdateMessage
+		!normalizedContent.protocolMessage &&
+		!normalizedContent.reactionMessage &&
+		!normalizedContent.pollUpdateMessage
 	)
 }
 
