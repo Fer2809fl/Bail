@@ -1,4 +1,5 @@
 import { randomBytes } from 'crypto'
+import { Boom } from '@neykoor/boom'
 import {
 	generateWAMessage,
 	generateWAMessageContent,
@@ -27,6 +28,8 @@ export type SmgssConfig = {
 	generateHighQualityLinkPreview?: boolean
 	mediaCache?: any
 	options?: RequestInit
+	albumItemDelayMs?: number
+	emitOwnEvents?: boolean
 }
 
 export type SmgssSock = {
@@ -34,17 +37,30 @@ export type SmgssSock = {
 }
 
 type RelayMessageFn = (jid: string, message: any, opts?: any) => Promise<any>
+type MessageMutexFn = { mutex: (task: () => Promise<any>) => Promise<any> }
+type UpsertMessageFn = (msg: any, type: any) => Promise<any>
 
 export class Smgss {
 	constructor(
 		private waUploadToServer: WAMediaUploadFunction,
 		private relayMessage: RelayMessageFn,
 		private config: SmgssConfig,
-		private sock: SmgssSock
+		private sock: SmgssSock,
+		private messageMutex?: MessageMutexFn,
+		private upsertMessage?: UpsertMessageFn
 	) {}
 
 	private get meJid() {
 		return jidNormalizedUser(this.sock.authState?.creds?.me?.id || '')
+	}
+
+	private emitSent(msg: any) {
+		if (!this.config.emitOwnEvents || !this.messageMutex || !this.upsertMessage) return
+		const mutex = this.messageMutex
+		const upsert = this.upsertMessage
+		process.nextTick(async () => {
+			await mutex.mutex(() => upsert(msg, 'append'))
+		})
 	}
 
 	detectType(content: any): SmgssContentType | null {
@@ -60,7 +76,7 @@ export class Smgss {
 		return null
 	}
 
-	async handle(type: SmgssContentType, content: any, jid: string, quoted?: any) {
+	async handle(type: SmgssContentType, content: any, jid: string, quoted?: any, options?: any) {
 		switch (type) {
 			case 'PAYMENT':
 				return this.handlePayment(content, quoted)
@@ -73,7 +89,7 @@ export class Smgss {
 			case 'CAROUSEL':
 				return this.handleCarousel(content)
 			case 'ALBUM':
-				return this.handleAlbum(content, jid, quoted)
+				return this.handleAlbum(content, jid, quoted, options)
 			case 'EVENT':
 				return this.handleEvent(content, jid, quoted)
 			case 'POLL_RESULT':
@@ -319,8 +335,8 @@ export class Smgss {
 		} else if (location) {
 			headerContent = {
 				locationMessage: {
-					degreesLatitude: location.degressLatitude || location.degreesLatitude || 0,
-					degreesLongitude: location.degressLongitude || location.degreesLongitude || 0,
+					degreesLatitude: location.degreesLatitude || location.degressLatitude || 0,
+					degreesLongitude: location.degreesLongitude || location.degressLongitude || 0,
 					name: location.name || ''
 				}
 			}
@@ -384,41 +400,41 @@ export class Smgss {
 	async handleCarousel(content: any) {
 		const { interactiveMessage } = content
 		const { body, footer, header, carouselMessage, contextInfo } = interactiveMessage
-		const processedCards: any[] = []
-
-		for (const card of carouselMessage.cards) {
-			const cardMsg: any = {
-				body: card.body || { text: '' },
-				footer: card.footer || { text: '' },
-				header: { title: card.header?.title || '', hasMediaAttachment: false }
-			}
-
-			if (card.nativeFlowMessage) {
-				cardMsg.nativeFlowMessage = card.nativeFlowMessage
-			}
-
-			if (card.header?.imageMessage || card.header?.videoMessage || card.header?.documentMessage) {
-				let headerContent: any = {}
-
-				if (card.header.imageMessage) {
-					const url = card.header.imageMessage.url || card.header.imageMessage
-					const src = typeof url === 'string' ? { image: { url } } : { image: url }
-					headerContent = await prepareWAMessageMedia(src as any, { upload: this.waUploadToServer } as any)
-				} else if (card.header.videoMessage) {
-					const url = card.header.videoMessage.url || card.header.videoMessage
-					const src = typeof url === 'string' ? { video: { url } } : { video: url }
-					headerContent = await prepareWAMessageMedia(src as any, { upload: this.waUploadToServer } as any)
-				} else if (card.header.documentMessage) {
-					const url = card.header.documentMessage.url || card.header.documentMessage
-					const src = typeof url === 'string' ? { document: { url } } : { document: url }
-					headerContent = await prepareWAMessageMedia(src as any, { upload: this.waUploadToServer } as any)
+		const processedCards: any[] = await Promise.all(
+			carouselMessage.cards.map(async (card: any) => {
+				const cardMsg: any = {
+					body: card.body || { text: '' },
+					footer: card.footer || { text: '' },
+					header: { title: card.header?.title || '', hasMediaAttachment: false }
 				}
 
-				cardMsg.header = { title: card.header?.title || '', hasMediaAttachment: true, ...headerContent }
-			}
+				if (card.nativeFlowMessage) {
+					cardMsg.nativeFlowMessage = card.nativeFlowMessage
+				}
 
-			processedCards.push(cardMsg)
-		}
+				if (card.header?.imageMessage || card.header?.videoMessage || card.header?.documentMessage) {
+					let headerContent: any = {}
+
+					if (card.header.imageMessage) {
+						const url = card.header.imageMessage.url || card.header.imageMessage
+						const src = typeof url === 'string' ? { image: { url } } : { image: url }
+						headerContent = await prepareWAMessageMedia(src as any, { upload: this.waUploadToServer } as any)
+					} else if (card.header.videoMessage) {
+						const url = card.header.videoMessage.url || card.header.videoMessage
+						const src = typeof url === 'string' ? { video: { url } } : { video: url }
+						headerContent = await prepareWAMessageMedia(src as any, { upload: this.waUploadToServer } as any)
+					} else if (card.header.documentMessage) {
+						const url = card.header.documentMessage.url || card.header.documentMessage
+						const src = typeof url === 'string' ? { document: { url } } : { document: url }
+						headerContent = await prepareWAMessageMedia(src as any, { upload: this.waUploadToServer } as any)
+					}
+
+					cardMsg.header = { title: card.header?.title || '', hasMediaAttachment: true, ...headerContent }
+				}
+
+				return cardMsg
+			})
+		)
 
 		const interactiveMsg: any = {
 			body: body || { text: '' },
@@ -447,25 +463,45 @@ export class Smgss {
 		}
 	}
 
-	async handleAlbum(content: any, jid: string, quoted?: any) {
+	async handleAlbum(content: any, jid: string, quoted?: any, options?: any) {
 		const array = content.albumMessage || content.album
+		if (!Array.isArray(array)) {
+			throw new Boom('Invalid album type. Expected an array.', { statusCode: 400 })
+		}
+
+		const imageCount = array.filter((a: any) => 'image' in a).length
+		const videoCount = array.filter((a: any) => 'video' in a).length
+		if (imageCount + videoCount < 2) {
+			throw new Boom('Minimum provide 2 media to upload album message', { statusCode: 400 })
+		}
+
 		const ctxInfo = content.contextInfo || {}
+		const relayOpts = {
+			useCachedGroupMetadata: options?.useCachedGroupMetadata,
+			statusJidList: options?.statusJidList
+		}
 
 		const album = await generateWAMessageFromContent(
 			jid,
 			{
 				messageContextInfo: { messageSecret: randomBytes(32) },
 				albumMessage: {
-					expectedImageCount: array.filter((a: any) => 'image' in a).length,
-					expectedVideoCount: array.filter((a: any) => 'video' in a).length
+					expectedImageCount: imageCount,
+					expectedVideoCount: videoCount
 				}
 			} as any,
 			{ userJid: this.meJid, quoted, upload: this.waUploadToServer } as any
 		)
 
-		await this.relayMessage(jid, album.message, { messageId: album.key.id })
+		await this.relayMessage(jid, album.message, { messageId: album.key.id, ...relayOpts })
+		this.emitSent(album)
 
 		for (let item of array) {
+			if (!('image' in item) && !('video' in item)) {
+				this.config.logger?.warn('smgss.handleAlbum: skipping item without image/video')
+				continue
+			}
+
 			if (ctxInfo && Object.keys(ctxInfo).length > 0 && !item.contextInfo) {
 				item = { ...item, contextInfo: ctxInfo }
 			}
@@ -476,12 +512,13 @@ export class Smgss {
 					messageSecret: randomBytes(32),
 					messageAssociation: { associationType: 1, parentMessageKey: album.key }
 				}
-				await this.relayMessage(jid, img.message, { messageId: img.key.id })
+				await this.relayMessage(jid, img.message, { messageId: img.key.id, ...relayOpts })
+				this.emitSent(img)
 			} catch (err) {
 				this.config.logger?.error(`smgss.handleAlbum: failed to send item — ${err}`)
 			}
 
-			await delay(300)
+			await delay(this.config.albumItemDelayMs ?? 300)
 		}
 
 		return album
@@ -543,6 +580,7 @@ export class Smgss {
 
 	async handleGroupStory(content: any, jid: string) {
 		const storyData = content.groupStatusMessage
+		const messageSecret: Buffer = storyData.messageSecret || randomBytes(32)
 		const waMsgContent = storyData.message ? storyData : await generateWAMessageContent(storyData, { upload: this.waUploadToServer } as any)
 
 		const innerMsg: any = (waMsgContent as any).message || waMsgContent
@@ -558,9 +596,21 @@ export class Smgss {
 				else if (innerMsg.audioMessage) innerMsg[msgKey].contextInfo.statusSourceType = 3
 				else if (innerMsg.extendedTextMessage) innerMsg[msgKey].contextInfo.statusSourceType = 4
 			}
+
+			if (storyData.closeFriends || storyData.audienceType !== undefined) {
+				innerMsg[msgKey].contextInfo.statusAudienceMetadata = {
+					audienceType: storyData.audienceType ?? 1
+				}
+			}
 		}
 
-		const finalMsg = { groupStatusMessageV2: { message: innerMsg } }
-		return this.relayMessage(jid, finalMsg, { messageId: generateMessageID() })
+		innerMsg.messageContextInfo = { messageSecret }
+
+		const finalMsg = { messageContextInfo: { messageSecret }, groupStatusMessageV2: { message: innerMsg } }
+		const msgId = generateMessageID()
+		await this.relayMessage(jid, finalMsg, { messageId: msgId })
+		return { key: { id: msgId, remoteJid: jid, fromMe: true }, message: finalMsg }
 	}
-}
+          }
+
+
