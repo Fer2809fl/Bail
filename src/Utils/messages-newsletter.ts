@@ -192,3 +192,5 @@ export function makeNewsletterUtils(conn: NewsletterSendCapableSocket) {
 		deleteNewsletterMessage
 	}
 }
+
+			
