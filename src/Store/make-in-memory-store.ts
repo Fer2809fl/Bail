@@ -1,4 +1,4 @@
-import KeyedDBImport from '@adiwajshing/keyed-db'
+import KeyedDB from '@neykoor/keyed-db'
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { proto } from '../../WAProto/index.js'
 import { DEFAULT_CONNECTION_CONFIG } from '../Defaults/index.js'
@@ -19,36 +19,6 @@ type Comparable<T, K> = {
 	key: (v: T) => K
 	compare: (a: K, b: K) => number
 }
-
-type KeyedDBType<T, K> = {
-	length: number
-	first: T
-	last: T
-	toJSON(): T[]
-	insert(...values: T[]): void
-	upsert(...values: T[]): T[]
-	insertIfAbsent(...values: T[]): T[]
-	deleteById(id: string, assertPresent?: boolean): T
-	delete(value: T): T
-	slice(start?: number, end?: number): KeyedDBType<T, K>
-	clear(): void
-	get(id: string): T
-	all(): T[]
-	update(id: string, update: (value: T) => void): 1 | 2
-	filter(predicate: (value: T, index: number) => boolean): KeyedDBType<T, K>
-	paginatedByValue(
-		value: T | null,
-		limit: number,
-		predicate?: (value: T, index: number) => boolean,
-		mode?: 'before' | 'after'
-	): T[]
-	paginated(cursor: K | null, limit: number, predicate?: (value: T, index: number) => boolean, mode?: 'before' | 'after'): T[]
-}
-
-type KeyedDBConstructor = new <T, K>(key: Comparable<T, K>, id?: (v: T) => string) => KeyedDBType<T, K>
-
-const KeyedDB = ((KeyedDBImport as unknown as { default?: KeyedDBConstructor })?.default ??
-	(KeyedDBImport as unknown as KeyedDBConstructor)) as KeyedDBConstructor
 
 export type MinimalStoreSocket = {
 	profilePictureUrl: (jid: string, type?: 'preview' | 'image', timeoutMs?: number) => Promise<string | undefined>
@@ -119,12 +89,6 @@ export const makeInMemoryStore = (config: InMemoryStoreConfig = {}) => {
 		}
 	}
 
-	/**
-	 * binds to a BaileysEventEmitter.
-	 * It listens to all events and constructs a state that you can query accurate data from.
-	 * Eg. can use the store to fetch chats, contacts, messages etc.
-	 * @param ev typically the event emitter from the socket connection
-	 */
 	const bind = (ev: BaileysEventEmitter) => {
 		ev.on('connection.update', update => {
 			Object.assign(state, update)
@@ -155,11 +119,12 @@ export const makeInMemoryStore = (config: InMemoryStoreConfig = {}) => {
 			logger.debug({ deletedContacts: isLatest ? oldContacts.size : 0, newContacts }, 'synced contacts')
 
 			for (const msg of newMessages) {
-				const jid = msg.key.remoteJidAlt || msg.key.remoteJid
-				if (!jid) {
+				const rawJid = msg.key.remoteJidAlt || msg.key.remoteJid
+				if (!rawJid) {
 					continue
 				}
 
+				const jid = jidNormalizedUser(rawJid)
 				const list = assertMessageList(jid)
 				list.upsert(msg, 'prepend')
 			}
@@ -172,25 +137,28 @@ export const makeInMemoryStore = (config: InMemoryStoreConfig = {}) => {
 		})
 
 		ev.on('contacts.update', async updates => {
+			let hashToContactId: Map<string, string> | undefined
+
 			for (const update of updates) {
 				let contact: Contact | undefined
 				if (update.id && contacts[update.id]) {
 					contact = contacts[update.id]
 				} else {
-					const contactHashes = await Promise.all(
-						Object.keys(contacts).map(async contactId => {
-							const decoded = jidDecode(contactId)
-							const user = decoded?.user || ''
-							return [
-								contactId,
-								Buffer.from(await md5(Buffer.from(user + 'WA_ADD_NOTIF', 'utf8')))
+					if (!hashToContactId) {
+						hashToContactId = new Map()
+						await Promise.all(
+							Object.keys(contacts).map(async contactId => {
+								const decoded = jidDecode(contactId)
+								const user = decoded?.user || ''
+								const hash = Buffer.from(await md5(Buffer.from(user + 'WA_ADD_NOTIF', 'utf8')))
 									.toString('base64')
 									.slice(0, 3)
-							] as const
-						})
-					)
+								hashToContactId!.set(hash, contactId)
+							})
+						)
+					}
 
-					const matched = contactHashes.find(([, b]) => b === update.id)?.[0]
+					const matched = update.id ? hashToContactId.get(update.id) : undefined
 					contact = matched ? contacts[matched] : undefined
 				}
 
@@ -239,7 +207,6 @@ export const makeInMemoryStore = (config: InMemoryStoreConfig = {}) => {
 				return labels.deleteById(label.id)
 			}
 
-			// WhatsApp can store only up to 20 labels
 			if (labels.count() < 20) {
 				return labels.upsertById(label.id, label)
 			}
@@ -256,7 +223,7 @@ export const makeInMemoryStore = (config: InMemoryStoreConfig = {}) => {
 					labelAssociations.delete(association)
 					break
 				default:
-					console.error(`unknown operation type [${type}]`)
+					logger.error({ type }, 'unknown operation type')
 			}
 		})
 
@@ -304,11 +271,10 @@ export const makeInMemoryStore = (config: InMemoryStoreConfig = {}) => {
 
 		ev.on('messages.update', updates => {
 			for (const { update, key } of updates) {
-				if (!key.remoteJid) {
-					continue
-				}
+				const rawJid = key.remoteJidAlt || key.remoteJid
+				if (!rawJid) continue
 
-				const list = assertMessageList(jidNormalizedUser(key.remoteJid))
+				const list = assertMessageList(jidNormalizedUser(rawJid))
 				if (update?.status !== undefined && key.id) {
 					const listStatus = list.get(key.id)?.status
 					if (listStatus && update.status && update.status <= listStatus) {
@@ -327,11 +293,12 @@ export const makeInMemoryStore = (config: InMemoryStoreConfig = {}) => {
 
 		ev.on('messages.delete', item => {
 			if ('all' in item) {
-				const list = messages[item.jid]
+				const list = messages[jidNormalizedUser(item.jid)]
 				list?.clear()
 			} else {
 				const firstKey = item.keys[0]
-				const jid = firstKey?.remoteJidAlt || firstKey?.remoteJid
+				const rawJid = firstKey?.remoteJidAlt || firstKey?.remoteJid
+				const jid = rawJid ? jidNormalizedUser(rawJid) : undefined
 				const list = jid ? messages[jid] : undefined
 				if (list) {
 					const idSet = new Set(item.keys.map(k => k.id))
@@ -406,8 +373,8 @@ export const makeInMemoryStore = (config: InMemoryStoreConfig = {}) => {
 
 		ev.on('message-receipt.update', updates => {
 			for (const { key, receipt } of updates) {
-				const jid = key.remoteJidAlt || key.remoteJid
-				const obj = jid ? messages[jid] : undefined
+				const rawJid = key.remoteJidAlt || key.remoteJid
+				const obj = rawJid ? messages[jidNormalizedUser(rawJid)] : undefined
 				const msg = key.id ? obj?.get(key.id) : undefined
 				if (msg) {
 					updateMessageWithReceipt(msg, receipt)
@@ -417,8 +384,8 @@ export const makeInMemoryStore = (config: InMemoryStoreConfig = {}) => {
 
 		ev.on('messages.reaction', reactions => {
 			for (const { key, reaction } of reactions) {
-				const jid = key.remoteJidAlt || key.remoteJid
-				const obj = jid ? messages[jid] : undefined
+				const rawJid = key.remoteJidAlt || key.remoteJid
+				const obj = rawJid ? messages[jidNormalizedUser(rawJid)] : undefined
 				const msg = key.id ? obj?.get(key.id) : undefined
 				if (msg) {
 					updateMessageWithReaction(msg, reaction)
@@ -465,54 +432,37 @@ export const makeInMemoryStore = (config: InMemoryStoreConfig = {}) => {
 		labels,
 		labelAssociations,
 		bind,
-		/** loads messages from the store, if not found -- uses the legacy connection */
 		loadMessages: async (jid: string, count: number, cursor: { before: WAMessageKey | undefined } | { after: WAMessageKey | undefined } | undefined) => {
-			const list = assertMessageList(jid)
+			const list = messages[jidNormalizedUser(jid)]
 			const mode = !cursor || 'before' in cursor ? 'before' : 'after'
 			const cursorKey = cursor ? ('before' in cursor ? cursor.before : cursor.after) : undefined
-			const cursorValue = cursorKey?.id ? list.get(cursorKey.id) : undefined
+			const cursorValue = cursorKey?.id ? list?.get(cursorKey.id) : undefined
 
-			let messages: WAMessage[]
+			let result: WAMessage[]
 			if (list && mode === 'before' && (!cursorKey || cursorValue)) {
 				if (cursorValue) {
 					const msgIdx = list.array.findIndex(m => m.key.id === cursorKey?.id)
-					messages = list.array.slice(0, msgIdx)
+					result = list.array.slice(0, msgIdx)
 				} else {
-					messages = list.array
+					result = list.array
 				}
 
-				const diff = count - messages.length
+				const diff = count - result.length
 				if (diff < 0) {
-					messages = messages.slice(-count) // get the last X messages
+					result = result.slice(-count)
 				}
 			} else {
-				messages = []
+				result = []
 			}
 
-			return messages
+			return result
 		},
-		/**
-		 * Get all available labels for profile
-		 *
-		 * Keep in mind that the list is formed from predefined tags and tags
-		 * that were "caught" during their editing.
-		 */
 		getLabels: () => {
 			return labels
 		},
-		/**
-		 * Get labels for chat
-		 *
-		 * @returns Label IDs
-		 **/
 		getChatLabels: (chatId: string) => {
 			return labelAssociations.filter(la => la.chatId === chatId).all()
 		},
-		/**
-		 * Get labels for message
-		 *
-		 * @returns Label IDs
-		 **/
 		getMessageLabels: (messageId: string) => {
 			const associations = labelAssociations
 				.filter(la => la.type === LabelAssociationType.Message && la.messageId === messageId)
@@ -520,9 +470,9 @@ export const makeInMemoryStore = (config: InMemoryStoreConfig = {}) => {
 
 			return associations.map(({ labelId }) => labelId)
 		},
-		loadMessage: async (jid: string, id: string) => messages[jid]?.get(id),
+		loadMessage: async (jid: string, id: string) => messages[jidNormalizedUser(jid)]?.get(id),
 		mostRecentMessage: async (jid: string) => {
-			const message = messages[jid]?.array.slice(-1)[0]
+			const message = messages[jidNormalizedUser(jid)]?.array.slice(-1)[0]
 			return message
 		},
 		fetchImageUrl: async (jid: string, sock?: MinimalStoreSocket) => {
@@ -569,3 +519,4 @@ export const makeInMemoryStore = (config: InMemoryStoreConfig = {}) => {
 }
 
 export type InMemoryStore = ReturnType<typeof makeInMemoryStore>
+
