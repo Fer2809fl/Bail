@@ -1,4 +1,5 @@
-import { decrypt, encrypt } from 'libsignal/src/crypto'
+import { decrypt, encrypt } from 'libsignal/lib/crypto.js'
+import { SessionError } from 'libsignal'
 import { SenderKeyMessage } from './sender-key-message'
 import { SenderKeyName } from './sender-key-name'
 import { SenderKeyRecord } from './sender-key-record'
@@ -31,7 +32,7 @@ export class GroupCipher {
 		}
 
 		const iteration = senderKeyState.getSenderChainKey().getIteration()
-		const senderKey = this.getSenderKey(senderKeyState, iteration === 0 ? 0 : iteration + 1)
+		const senderKey = this.getSenderKey(senderKeyState, iteration)
 
 		const ciphertext = await this.getCipherText(senderKey.getIv(), senderKey.getCipherKey(), paddedPlaintext)
 
@@ -103,7 +104,7 @@ export class GroupCipher {
 		try {
 			return decrypt(key, ciphertext, iv)
 		} catch (e) {
-			throw new Error('InvalidMessageException')
+			throw new SessionError('InvalidMessageException')
 		}
 	}
 
@@ -111,7 +112,7 @@ export class GroupCipher {
 		try {
 			return encrypt(key, plaintext, iv)
 		} catch (e) {
-			throw new Error('InvalidMessageException')
+			throw new SessionError('InvalidMessageException')
 		}
 	}
 }
