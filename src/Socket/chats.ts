@@ -1,5 +1,6 @@
-import NodeCache from '@cacheable/node-cache'
-import { Boom } from '@hapi/boom'
+import NodeCache from '@neykoor/node-cache'
+import { Boom } from '@neykoor/boom'
+import { LRUCache } from 'lru-cache'
 import { proto } from '../../WAProto/index.js'
 import { DEFAULT_CACHE_TTLS, HISTORY_SYNC_PAUSED_TIMEOUT_MS, PROCESSABLE_HISTORY_TYPES } from '../Defaults'
 import type {
@@ -15,6 +16,7 @@ import type {
 	WABusinessProfile,
 	WAMediaUpload,
 	WAMessage,
+	WAMessageKey,
 	WAPatchCreate,
 	WAPatchName,
 	WAPresence,
@@ -39,6 +41,7 @@ import {
 	extractSyncdPatches,
 	generateProfilePicture,
 	getHistoryMsg,
+	hasGroupStatusMessage,
 	isAppStateSyncIrrecoverable,
 	isMissingKeyError,
 	MAX_SYNC_ATTEMPTS,
@@ -76,8 +79,6 @@ export const buildProfilePictureQueryContent = (
 	return [picture]
 }
 
-const USER_ID_CACHE = new Map<string, { phoneNumber: string; lid: string }>()
-
 export const makeChatsSocket = (config: SocketConfig) => {
 	const {
 		logger,
@@ -89,6 +90,10 @@ export const makeChatsSocket = (config: SocketConfig) => {
 		getMessage
 	} = config
 	const sock = makeSocket(config)
+	const USER_ID_CACHE = new LRUCache<string, { phoneNumber: string; lid: string }>({
+		max: 10000,
+		ttl: 24 * 60 * 60 * 1000
+	})
 	const {
 		ev,
 		ws,
@@ -106,52 +111,43 @@ export const makeChatsSocket = (config: SocketConfig) => {
 
 	let privacySettings: { [_: string]: string } | undefined
 
-	/** Server-assigned AB props for protocol behavior. */
 	const serverProps = {
-		/** AB prop 10518: gate tctoken on 1:1 messages. Default true (safe: avoids 463). */
+
 		privacyTokenOn1to1: true,
-		/** AB prop 9666: gate tctoken on profile picture IQs. WA Web default: true. */
+
 		profilePicPrivacyToken: true,
-		/** AB prop 14303: issue tctokens to LID instead of PN. WA Web default: false. */
+
 		lidTrustedTokenIssueToLid: false
 	}
 
 	let syncState: SyncState = SyncState.Connecting
 
-	/** this mutex ensures that messages are processed in order */
 	const messageMutex = makeMutex()
 
-	/** this mutex ensures that receipts are processed in order */
 	const receiptMutex = makeMutex()
 
-	/** this mutex ensures that app state patches are processed in order */
 	const appStatePatchMutex = makeMutex()
 
-	/** this mutex ensures that notifications are processed in order */
 	const notificationMutex = makeMutex()
 
-	// Timeout for AwaitingInitialSync state
 	let awaitingSyncTimeout: NodeJS.Timeout | undefined
 
-	// In-memory history sync completion tracking (resets on reconnection)
 	const historySyncStatus = {
 		initialBootstrapComplete: false,
 		recentSyncComplete: false
 	}
 	let historySyncPausedTimeout: NodeJS.Timeout | undefined
 
-	// Collections blocked on missing app state sync keys (mirrors WA Web's "Blocked" state).
-	// When a key arrives via APP_STATE_SYNC_KEY_SHARE, these are re-synced.
+
 	const blockedCollections = new Set<WAPatchName>()
 
 	const placeholderResendCache =
 		config.placeholderResendCache ||
 		(new NodeCache<number>({
-			stdTTL: DEFAULT_CACHE_TTLS.MSG_RETRY, // 1 hour
+			stdTTL: DEFAULT_CACHE_TTLS.MSG_RETRY,
 			useClones: false
 		}) as CacheStore)
 
-	/** helper function to fetch the given app state sync key */
 	const getAppStateSyncKey = async (keyId: string) => {
 		const { [keyId]: key } = await authState.keys.get('app-state-sync-key', [keyId])
 		return key
@@ -174,7 +170,6 @@ export const makeChatsSocket = (config: SocketConfig) => {
 		return privacySettings
 	}
 
-	/** helper function to run a privacy IQ query */
 	const privacyQuery = async (name: string, value: string) => {
 		await query({
 			tag: 'iq',
@@ -284,6 +279,25 @@ export const makeChatsSocket = (config: SocketConfig) => {
 		return botList
 	}
 
+	const getLidUser = async (jid: string) => {
+		if (!jid) {
+			throw new Boom('Please input a jid user')
+		}
+
+		if (!isPnUser(jid) && !isLidUser(jid)) {
+			throw new Boom('Invalid JID: Not a user JID!')
+		}
+
+		const targetJid = jid.includes('@') ? jid : `${jid}@s.whatsapp.net`
+
+		const usyncQuery = new USyncQuery().withLIDProtocol().withUser(new USyncUser().withId(targetJid))
+
+		const result = await sock.executeUSyncQuery(usyncQuery)
+		if (result) {
+			return result.list
+		}
+	}
+
 	const fetchStatus = async (...jids: string[]) => {
 		const usyncQuery = new USyncQuery().withStatusProtocol()
 
@@ -349,7 +363,6 @@ export const makeChatsSocket = (config: SocketConfig) => {
 		return userId
 	}
 
-	/** update the profile picture for yourself or a group */
 	const updateProfilePicture = async (
 		jid: string,
 		content: WAMediaUpload,
@@ -364,7 +377,7 @@ export const makeChatsSocket = (config: SocketConfig) => {
 		}
 
 		if (jidNormalizedUser(jid) !== jidNormalizedUser(authState.creds.me!.id)) {
-			targetJid = jidNormalizedUser(jid) // in case it is someone other than us
+			targetJid = jidNormalizedUser(jid)
 		} else {
 			targetJid = undefined
 		}
@@ -388,7 +401,6 @@ export const makeChatsSocket = (config: SocketConfig) => {
 		})
 	}
 
-	/** remove the profile picture for yourself or a group */
 	const removeProfilePicture = async (jid: string) => {
 		let targetJid
 		if (!jid) {
@@ -398,7 +410,7 @@ export const makeChatsSocket = (config: SocketConfig) => {
 		}
 
 		if (jidNormalizedUser(jid) !== jidNormalizedUser(authState.creds.me!.id)) {
-			targetJid = jidNormalizedUser(jid) // in case it is someone other than us
+			targetJid = jidNormalizedUser(jid)
 		} else {
 			targetJid = undefined
 		}
@@ -414,7 +426,6 @@ export const makeChatsSocket = (config: SocketConfig) => {
 		})
 	}
 
-	/** update the profile status for yourself */
 	const updateProfileStatus = async (status: string) => {
 		await query({
 			tag: 'iq',
@@ -617,21 +628,18 @@ export const makeChatsSocket = (config: SocketConfig) => {
 				return key
 			}
 
-			// we use this to determine which events to fire
-			// otherwise when we resync from scratch -- all notifications will fire
+
 			const initialVersionMap: { [T in WAPatchName]?: number } = {}
 			const globalMutationMap: ChatMutationMap = {}
 
 			await authState.keys.transaction(async () => {
 				const collectionsToHandle = new Set<string>(collections)
-				// in case something goes wrong -- ensure we don't enter a loop that cannot be exited from
+
 				const attemptsMap: { [T in WAPatchName]?: number } = {}
-				// collections that failed and need a full snapshot on retry
-				// mirrors WA Web's ErrorFatal -> force snapshot behavior
+
 				const forceSnapshotCollections = new Set<WAPatchName>()
-				// keep executing till all collections are done
-				// sometimes a single patch request will not return all the patches (God knows why)
-				// so we fetch till they're all done (this is determined by the "has_more_patches" flag)
+
+
 				while (collectionsToHandle.size) {
 					const states = {} as { [T in WAPatchName]: LTHashState }
 					const nodes: BinaryNode[] = []
@@ -663,7 +671,7 @@ export const makeChatsSocket = (config: SocketConfig) => {
 							attrs: {
 								name,
 								version: state.version.toString(),
-								// return snapshot if syncing from scratch or forcing after a failed attempt
+
 								return_snapshot: (shouldForceSnapshot || !state.version).toString()
 							}
 						})
@@ -685,7 +693,6 @@ export const makeChatsSocket = (config: SocketConfig) => {
 						]
 					})
 
-					// extract from binary node
 					const decoded = await extractSyncdPatches(result, config?.options)
 					for (const key in decoded) {
 						const name = key as WAPatchName
@@ -708,7 +715,6 @@ export const makeChatsSocket = (config: SocketConfig) => {
 								await authState.keys.set({ 'app-state-sync-version': { [name]: newState } })
 							}
 
-							// only process if there are syncd patches
 							if (patches.length) {
 								const { state: newState, mutationMap } = await decodePatches(
 									name,
@@ -732,7 +738,7 @@ export const makeChatsSocket = (config: SocketConfig) => {
 							if (hasMorePatches) {
 								logger.info(`${name} has more patches...`)
 							} else {
-								// collection is done with sync
+
 								collectionsToHandle.delete(name)
 							}
 						} catch (error: any) {
@@ -748,8 +754,7 @@ export const makeChatsSocket = (config: SocketConfig) => {
 							}
 
 							if (isMissingKeyError(error) && attemptsMap[name] >= MAX_SYNC_ATTEMPTS) {
-								// WA Web treats missing keys as "Blocked" — park the collection
-								// until the key arrives via APP_STATE_SYNC_KEY_SHARE.
+
 								logger.warn(
 									logData,
 									`${name} blocked on missing key from v${states[name].version}, parking after ${attemptsMap[name]} attempts`
@@ -757,7 +762,7 @@ export const makeChatsSocket = (config: SocketConfig) => {
 								blockedCollections.add(name)
 								collectionsToHandle.delete(name)
 							} else if (isMissingKeyError(error)) {
-								// Retry with a snapshot which may use a different key.
+
 								logger.info(
 									logData,
 									`${name} blocked on missing key from v${states[name].version}, retrying with snapshot`
@@ -768,8 +773,7 @@ export const makeChatsSocket = (config: SocketConfig) => {
 								collectionsToHandle.delete(name)
 							} else {
 								logger.info(logData, `failed to sync ${name} from v${states[name].version}, forcing snapshot retry`)
-								// force a full snapshot on retry to recover from
-								// corrupted local state (e.g. LTHash MAC mismatch)
+
 								forceSnapshotCollections.add(name)
 							}
 						}
@@ -784,15 +788,9 @@ export const makeChatsSocket = (config: SocketConfig) => {
 		}
 	)
 
-	/**
-	 * fetch the profile picture of a user/group
-	 * type = "preview" for a low res picture
-	 * type = "image for the high res picture"
-	 */
 	const profilePictureUrl = async (jid: string, type: 'preview' | 'image' = 'preview', timeoutMs?: number) => {
-		// WA Web only includes tctoken for user JIDs (not groups/newsletters)
-		// and never for own profile pic (Chat model for self has no tcToken).
-		// Including tctoken for own JID causes the server to never respond.
+
+
 		const normalizedJid = jidNormalizedUser(jid)
 		const isUserJid = isPnUser(normalizedJid) || isLidUser(normalizedJid)
 		const me = authState.creds.me
@@ -890,12 +888,8 @@ export const makeChatsSocket = (config: SocketConfig) => {
 		}
 	}
 
-	/**
-	 * @param toJid the jid to subscribe to
-	 * @param tcToken token for subscription, use if present
-	 */
 	const presenceSubscribe = async (toJid: string) => {
-		// Only include tctoken for user JIDs — groups/newsletters don't use tctokens
+
 		const normalizedToJid = jidNormalizedUser(toJid)
 		const isUserJid = isPnUser(normalizedToJid) || isLidUser(normalizedToJid)
 		const tcTokenContent = isUserJid
@@ -1025,7 +1019,6 @@ export const makeChatsSocket = (config: SocketConfig) => {
 		}
 	}
 
-	/** fetch AB props */
 	const fetchProps = async () => {
 		const resultNode = await query({
 			tag: 'iq',
@@ -1050,7 +1043,7 @@ export const makeChatsSocket = (config: SocketConfig) => {
 		let props: { [_: string]: string } = {}
 		if (propsNode) {
 			if (propsNode.attrs?.hash) {
-				// on some clients, the hash is returning as undefined
+
 				authState.creds.lastPropHash = propsNode?.attrs?.hash
 				ev.emit('creds.update', authState.creds)
 			}
@@ -1058,7 +1051,6 @@ export const makeChatsSocket = (config: SocketConfig) => {
 			props = reduceBinaryNodeToDictionary(propsNode, 'prop')
 		}
 
-		// Extract protocol-relevant AB props (only the ones we need)
 		const privacyTokenProp = props['10518'] ?? props['privacy_token_sending_on_all_1_on_1_messages']
 		if (privacyTokenProp !== undefined) {
 			serverProps.privacyTokenOn1to1 = privacyTokenProp === 'true' || privacyTokenProp === '1'
@@ -1079,19 +1071,21 @@ export const makeChatsSocket = (config: SocketConfig) => {
 		return props
 	}
 
-	/**
-	 * modify a chat -- mark unread, read etc.
-	 * lastMessages must be sorted in reverse chronologically
-	 * requires the last messages till the last message received; required for archive & unread
-	 */
 	const chatModify = (mod: ChatModification, jid: string) => {
 		const patch = chatModificationToAppPatch(mod, jid)
 		return appPatch(patch)
 	}
 
-	/**
-	 * Enable/Disable link preview privacy, not related to baileys link preview generation
-	 */
+	const clearMessage = (jid: string, key: WAMessageKey, timeStamp: number) => {
+		return chatModify(
+			{
+				delete: true,
+				lastMessages: [{ key, messageTimestamp: timeStamp }]
+			},
+			jid
+		)
+	}
+
 	const updateDisableLinkPreviewsPrivacy = (isPreviewsDisabled: boolean) => {
 		return chatModify(
 			{
@@ -1101,9 +1095,6 @@ export const makeChatsSocket = (config: SocketConfig) => {
 		)
 	}
 
-	/**
-	 * Star or Unstar a message
-	 */
 	const star = (jid: string, messages: { id: string; fromMe?: boolean }[], star: boolean) => {
 		return chatModify(
 			{
@@ -1116,9 +1107,6 @@ export const makeChatsSocket = (config: SocketConfig) => {
 		)
 	}
 
-	/**
-	 * Add or Edit Contact
-	 */
 	const addOrEditContact = (jid: string, contact: proto.SyncActionValue.IContactAction) => {
 		return chatModify(
 			{
@@ -1128,9 +1116,6 @@ export const makeChatsSocket = (config: SocketConfig) => {
 		)
 	}
 
-	/**
-	 * Remove Contact
-	 */
 	const removeContact = (jid: string) => {
 		return chatModify(
 			{
@@ -1140,9 +1125,6 @@ export const makeChatsSocket = (config: SocketConfig) => {
 		)
 	}
 
-	/**
-	 * Adds label
-	 */
 	const addLabel = (jid: string, labels: LabelActionBody) => {
 		return chatModify(
 			{
@@ -1154,9 +1136,6 @@ export const makeChatsSocket = (config: SocketConfig) => {
 		)
 	}
 
-	/**
-	 * Adds label for the chats
-	 */
 	const addChatLabel = (jid: string, labelId: string) => {
 		return chatModify(
 			{
@@ -1168,9 +1147,6 @@ export const makeChatsSocket = (config: SocketConfig) => {
 		)
 	}
 
-	/**
-	 * Removes label for the chat
-	 */
 	const removeChatLabel = (jid: string, labelId: string) => {
 		return chatModify(
 			{
@@ -1182,9 +1158,6 @@ export const makeChatsSocket = (config: SocketConfig) => {
 		)
 	}
 
-	/**
-	 * Adds label for the message
-	 */
 	const addMessageLabel = (jid: string, messageId: string, labelId: string) => {
 		return chatModify(
 			{
@@ -1197,9 +1170,6 @@ export const makeChatsSocket = (config: SocketConfig) => {
 		)
 	}
 
-	/**
-	 * Removes label for the message
-	 */
 	const removeMessageLabel = (jid: string, messageId: string, labelId: string) => {
 		return chatModify(
 			{
@@ -1212,9 +1182,6 @@ export const makeChatsSocket = (config: SocketConfig) => {
 		)
 	}
 
-	/**
-	 * Add or Edit Quick Reply
-	 */
 	const addOrEditQuickReply = (quickReply: QuickReplyAction) => {
 		return chatModify(
 			{
@@ -1224,9 +1191,6 @@ export const makeChatsSocket = (config: SocketConfig) => {
 		)
 	}
 
-	/**
-	 * Remove Quick Reply
-	 */
 	const removeQuickReply = (timestamp: string) => {
 		return chatModify(
 			{
@@ -1236,10 +1200,6 @@ export const makeChatsSocket = (config: SocketConfig) => {
 		)
 	}
 
-	/**
-	 * queries need to be fired on connection open
-	 * help ensure parity with WA Web
-	 * */
 	const executeInitQueries = async () => {
 		await Promise.all([fetchProps(), fetchBlocklist(), fetchPrivacySettings()])
 	}
@@ -1279,6 +1239,10 @@ export const makeChatsSocket = (config: SocketConfig) => {
 			msg.isSystemNotification = true
 		}
 
+		if (hasGroupStatusMessage(msg)) {
+			msg.isGroupStatus = true
+		}
+
 		ev.emit('messages.upsert', { messages: [msg], type })
 
 		if (!!msg.pushName) {
@@ -1289,7 +1253,6 @@ export const makeChatsSocket = (config: SocketConfig) => {
 				ev.emit('contacts.update', [{ id: jid, notify: msg.pushName, verifiedName: msg.verifiedBizName! }])
 			}
 
-			// update our pushname too
 			if (msg.key.fromMe && msg.pushName && authState.creds.me?.name !== msg.pushName) {
 				ev.emit('creds.update', { me: { ...authState.creds.me!, name: msg.pushName } })
 			}
@@ -1304,7 +1267,6 @@ export const makeChatsSocket = (config: SocketConfig) => {
 		if (historyMsg && shouldProcessHistoryMsg) {
 			const syncType = historyMsg.syncType as proto.HistorySync.HistorySyncType
 
-			// INITIAL_BOOTSTRAP — fire immediately, no progress check (same as WA Web K function)
 			if (
 				syncType === proto.HistorySync.HistorySyncType.INITIAL_BOOTSTRAP &&
 				!historySyncStatus.initialBootstrapComplete
@@ -1317,7 +1279,6 @@ export const makeChatsSocket = (config: SocketConfig) => {
 				})
 			}
 
-			// RECENT with progress === 100 — explicit completion
 			if (
 				syncType === proto.HistorySync.HistorySyncType.RECENT &&
 				historyMsg.progress === 100 &&
@@ -1333,7 +1294,6 @@ export const makeChatsSocket = (config: SocketConfig) => {
 				})
 			}
 
-			// Reset 120s paused timeout on any RECENT chunk (like WA Web's handleChunkProgress)
 			if (syncType === proto.HistorySync.HistorySyncType.RECENT && !historySyncStatus.recentSyncComplete) {
 				clearTimeout(historySyncPausedTimeout)
 				historySyncPausedTimeout = setTimeout(() => {
@@ -1351,7 +1311,6 @@ export const makeChatsSocket = (config: SocketConfig) => {
 			}
 		}
 
-		// State machine: decide on sync and flush
 		if (historyMsg && syncState === SyncState.AwaitingInitialSync) {
 			if (awaitingSyncTimeout) {
 				clearTimeout(awaitingSyncTimeout)
@@ -1361,7 +1320,7 @@ export const makeChatsSocket = (config: SocketConfig) => {
 			if (shouldProcessHistoryMsg) {
 				syncState = SyncState.Syncing
 				logger.info('Transitioned to Syncing state')
-				// Let doAppStateSync handle the final flush after it's done
+
 			} else {
 				syncState = SyncState.Online
 				logger.info('History sync skipped, transitioning to Online state and flushing buffer')
@@ -1371,12 +1330,11 @@ export const makeChatsSocket = (config: SocketConfig) => {
 
 		const doAppStateSync = async () => {
 			if (syncState === SyncState.Syncing) {
-				// All collections will be synced, so clear any blocked ones
+
 				blockedCollections.clear()
 				logger.info('Doing app state sync')
 				await resyncAppState(ALL_WA_PATCH_NAMES, true)
 
-				// Sync is complete, go online and flush everything
 				syncState = SyncState.Online
 				logger.info('App state sync complete, transitioning to Online state and flushing buffer')
 				ev.flush()
@@ -1405,7 +1363,6 @@ export const makeChatsSocket = (config: SocketConfig) => {
 			})
 		])
 
-		// If the app state key arrives and we are waiting to sync, trigger the sync now.
 		if (msg.message?.protocolMessage?.appStateSyncKeyShare && syncState === SyncState.Syncing) {
 			logger.info('App state sync key arrived, triggering app state sync')
 			await doAppStateSync()
@@ -1432,7 +1389,7 @@ export const makeChatsSocket = (config: SocketConfig) => {
 
 				break
 			case 'groups':
-				// handled in groups.ts
+
 				break
 			default:
 				logger.info({ node }, 'received unknown sync')
@@ -1483,9 +1440,8 @@ export const makeChatsSocket = (config: SocketConfig) => {
 			return
 		}
 
-		// On reconnection (accountSyncCounter > 0), the server does not push
-		// history sync notifications — the device already has its data.
-		// Skip the 20s wait and go online immediately.
+
+
 		if (authState.creds.accountSyncCounter > 0) {
 			logger.info('Reconnection with existing sync data, skipping history sync wait. Transitioning to Online.')
 			syncState = SyncState.Online
@@ -1505,24 +1461,21 @@ export const makeChatsSocket = (config: SocketConfig) => {
 				syncState = SyncState.Online
 				ev.flush()
 
-				// Increment so subsequent reconnections skip the 20s wait.
-				// Late-arriving history is still processed via processMessage
-				// regardless of the state machine phase.
+
+
 				const accountSyncCounter = (authState.creds.accountSyncCounter || 0) + 1
 				ev.emit('creds.update', { accountSyncCounter })
 			}
 		}, 20_000)
 	})
 
-	// When an app state sync key arrives (myAppStateKeyId is set) and there are
-	// collections blocked on a missing key, trigger a re-sync for just those collections.
-	// This mirrors WA Web's Blocked → retry-on-key-arrival behavior.
+
+
 	ev.on('creds.update', ({ myAppStateKeyId }) => {
 		if (!myAppStateKeyId || blockedCollections.size === 0) {
 			return
 		}
 
-		// If we're in the middle of a full sync, doAppStateSync handles all collections
 		if (syncState === SyncState.Syncing) {
 			blockedCollections.clear()
 			return
@@ -1605,6 +1558,9 @@ export const makeChatsSocket = (config: SocketConfig) => {
 		removeMessageLabel,
 		star,
 		addOrEditQuickReply,
-		removeQuickReply
+		removeQuickReply,
+		clearMessage,
+		getLidUser
 	}
 }
+
