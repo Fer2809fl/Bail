@@ -1,4 +1,5 @@
-import { Boom } from '@hapi/boom'
+import { Boom } from '@neykoor/boom'
+import { LRUCache } from 'lru-cache'
 import { proto } from '../../WAProto/index.js'
 import type { GroupMetadata, GroupParticipant, ParticipantAction, SocketConfig, WAMessageKey } from '../Types'
 import { WAMessageAddressingMode, WAMessageStubType } from '../Types'
@@ -12,7 +13,8 @@ import {
 	isLidUser,
 	isPnUser,
 	jidEncode,
-	jidNormalizedUser
+	jidNormalizedUser,
+	type LidPhoneCache
 } from '../WABinary'
 import { makeChatsSocket } from './chats'
 
@@ -53,10 +55,15 @@ const resolveParticipantsLID = async (metadataList: GroupMetadata[], lidMapping:
 export const makeGroupsSocket = (config: SocketConfig) => {
 	const sock = makeChatsSocket(config)
 	const { authState, ev, query, upsertMessage, signalRepository } = sock
-	const { cachedGroupMetadata, groupCacheTTL } = config
+	const { cachedGroupMetadata, groupCacheTTL, logger } = config
 
-	const groupMetadataCache = new Map<string, GroupMetadataCacheEntry>()
 	const cacheTTL = groupCacheTTL > 0 ? groupCacheTTL : 5 * 60 * 1000
+	const groupMetadataCache = new LRUCache<string, GroupMetadataCacheEntry>({
+		max: 500,
+		ttl: cacheTTL,
+		updateAgeOnGet: false
+	})
+	const inflightGroupMetadataFetches = new Map<string, Promise<GroupMetadata>>()
 
 	const getCachedGroupMetadata = async (jid: string): Promise<GroupMetadata | undefined> => {
 		if (cachedGroupMetadata) {
@@ -67,7 +74,7 @@ export const makeGroupsSocket = (config: SocketConfig) => {
 		}
 
 		const entry = groupMetadataCache.get(jid)
-		if (entry && Date.now() - entry.ts < cacheTTL) {
+		if (entry) {
 			return entry.data
 		}
 
@@ -102,10 +109,12 @@ export const makeGroupsSocket = (config: SocketConfig) => {
 
 		try {
 			const result = await groupQuery(jid, 'get', [{ tag: 'query', attrs: { request: 'interactive' } }])
-			const meta = extractGroupMetadata(result)
+			const meta = extractGroupMetadata(result, signalRepository.lidMapping.phoneCache)
 			setCachedGroupMetadata(jid, meta)
 			ev.emit('groups.update', [meta])
-		} catch {}
+		} catch (err) {
+			logger?.warn({ err, jid }, 'failed to refresh group metadata')
+		}
 	}
 
 	ev.on('group-participants.update', ({ id, participants, action }) => {
@@ -152,11 +161,38 @@ export const makeGroupsSocket = (config: SocketConfig) => {
 			return cached
 		}
 
-		const result = await groupQuery(jid, 'get', [{ tag: 'query', attrs: { request: 'interactive' } }])
-		const meta = extractGroupMetadata(result)
-		await resolveParticipantsLID([meta], signalRepository.lidMapping)
-		setCachedGroupMetadata(jid, meta)
-		return meta
+		const inflight = inflightGroupMetadataFetches.get(jid)
+		if (inflight) {
+			return inflight
+		}
+
+		const fetchPromise = (async () => {
+			const result = await groupQuery(jid, 'get', [{ tag: 'query', attrs: { request: 'interactive' } }])
+			const meta = extractGroupMetadata(result, signalRepository.lidMapping.phoneCache)
+			await resolveParticipantsLID([meta], signalRepository.lidMapping)
+			setCachedGroupMetadata(jid, meta)
+			return meta
+		})()
+
+		inflightGroupMetadataFetches.set(jid, fetchPromise)
+
+		try {
+			return await fetchPromise
+		} finally {
+			inflightGroupMetadataFetches.delete(jid)
+		}
+	}
+
+	const resolveLidPhone = async (groupJid: string, lid: string): Promise<string | undefined> => {
+		const cached = signalRepository.lidMapping.phoneCache.getPhoneForLid(lid)
+		if (cached) return cached
+
+		try {
+			await groupMetadata(groupJid)
+			return signalRepository.lidMapping.phoneCache.getPhoneForLid(lid)
+		} catch {
+			return undefined
+		}
 	}
 
 	const groupFetchAllParticipating = async () => {
@@ -183,11 +219,14 @@ export const makeGroupsSocket = (config: SocketConfig) => {
 		if (groupsChild) {
 			const groups = getBinaryNodeChildren(groupsChild, 'group')
 			for (const groupNode of groups) {
-				const meta = extractGroupMetadata({
-					tag: 'result',
-					attrs: {},
-					content: [groupNode]
-				})
+				const meta = extractGroupMetadata(
+					{
+						tag: 'result',
+						attrs: {},
+						content: [groupNode]
+					},
+					signalRepository.lidMapping.phoneCache
+				)
 				data[meta.id] = meta
 			}
 		}
@@ -216,6 +255,7 @@ export const makeGroupsSocket = (config: SocketConfig) => {
 	return {
 		...sock,
 		groupMetadata,
+		resolveLidPhone,
 		groupCreate: async (subject: string, participants: string[]) => {
 			const key = generateMessageIDV2()
 			const result = await groupQuery('@g.us', 'set', [
@@ -231,7 +271,7 @@ export const makeGroupsSocket = (config: SocketConfig) => {
 					}))
 				}
 			])
-			return extractGroupMetadata(result)
+			return extractGroupMetadata(result, signalRepository.lidMapping.phoneCache)
 		},
 		groupLeave: async (id: string) => {
 			await groupQuery('@g.us', 'set', [
@@ -334,12 +374,6 @@ export const makeGroupsSocket = (config: SocketConfig) => {
 			return result?.attrs.jid
 		},
 
-		/**
-		 * revoke a v4 invite for someone
-		 * @param groupJid group jid
-		 * @param invitedJid jid of person you invited
-		 * @returns true if successful
-		 */
 		groupRevokeInviteV4: async (groupJid: string, invitedJid: string) => {
 			const result = await groupQuery(groupJid, 'set', [
 				{ tag: 'revoke', attrs: {}, content: [{ tag: 'participant', attrs: { jid: invitedJid } }] }
@@ -347,11 +381,6 @@ export const makeGroupsSocket = (config: SocketConfig) => {
 			return !!result
 		},
 
-		/**
-		 * accept a GroupInviteMessage
-		 * @param key the key of the invite message, or optionally only provide the jid of the person who sent the invite
-		 * @param inviteMessage the message to accept
-		 */
 		groupAcceptInviteV4: ev.createBufferedFunction(
 			async (key: string | WAMessageKey, inviteMessage: proto.Message.IGroupInviteMessage) => {
 				key = typeof key === 'string' ? { remoteJid: key } : key
@@ -366,10 +395,9 @@ export const makeGroupsSocket = (config: SocketConfig) => {
 					}
 				])
 
-				// if we have the full message key
-				// update the invite message to be expired
+
 				if (key.id) {
-					// create new invite message that is expired
+
 					inviteMessage = proto.Message.GroupInviteMessage.fromObject(inviteMessage)
 					inviteMessage.inviteExpiration = 0
 					inviteMessage.inviteCode = ''
@@ -385,7 +413,6 @@ export const makeGroupsSocket = (config: SocketConfig) => {
 					])
 				}
 
-				// generate the group add message
 				await upsertMessage(
 					{
 						key: {
@@ -407,7 +434,7 @@ export const makeGroupsSocket = (config: SocketConfig) => {
 		),
 		groupGetInviteInfo: async (code: string) => {
 			const results = await groupQuery('@g.us', 'get', [{ tag: 'invite', attrs: { code } }])
-			return extractGroupMetadata(results)
+			return extractGroupMetadata(results, signalRepository.lidMapping.phoneCache)
 		},
 		groupToggleEphemeral: async (jid: string, ephemeralExpiration: number) => {
 			const content: BinaryNode = ephemeralExpiration
@@ -445,6 +472,7 @@ export const makeGroupsSocket = (config: SocketConfig) => {
 			}
 
 			const botJid = authState.creds.me?.id
+			const botLid = authState.creds.me?.lid
 			const meta = await groupMetadata(groupJid).catch(() => undefined)
 			if (!meta || !Array.isArray(meta.participants)) {
 				return { isAdmin: false, isBotAdmin: false }
@@ -452,20 +480,29 @@ export const makeGroupsSocket = (config: SocketConfig) => {
 
 			const senderNorm = normalizeJid(senderJid)
 			const botNorm = normalizeJid(botJid)
+			const botLidNorm = normalizeJid(botLid)
 
-			const isAdminIn = (norm: string | null) =>
-				norm !== null &&
-				meta.participants.some(p => {
-					const pid = normalizeJid(p.id ?? p.phoneNumber ?? p.lid)
-					return pid === norm && (p.admin === 'admin' || p.admin === 'superadmin')
+			const isAdminIn = (...norms: Array<string | null>) => {
+				const targets = norms.filter((n): n is string => n !== null)
+				if (targets.length === 0) {
+					return false
+				}
+
+				return meta.participants.some(p => {
+					const candidates = [normalizeJid(p.id), normalizeJid(p.phoneNumber), normalizeJid(p.lid)].filter(
+						(c): c is string => c !== null
+					)
+					const isMatch = candidates.some(c => targets.includes(c))
+					return isMatch && (p.admin === 'admin' || p.admin === 'superadmin')
 				})
+			}
 
 			const isAdmin = isAdminIn(senderNorm)
-			let isBotAdmin = isAdminIn(botNorm)
+			let isBotAdmin = isAdminIn(botNorm, botLidNorm)
 
-			if (!isBotAdmin && botNorm) {
+			if (!isBotAdmin && (botNorm || botLidNorm)) {
 				const owners = [meta.owner, meta.ownerPn].filter(Boolean).map(normalizeJid)
-				if (owners.includes(botNorm)) {
+				if ((botNorm && owners.includes(botNorm)) || (botLidNorm && owners.includes(botLidNorm))) {
 					isBotAdmin = true
 				}
 			}
@@ -475,10 +512,10 @@ export const makeGroupsSocket = (config: SocketConfig) => {
 	}
 }
 
-export const extractGroupMetadata = (result: BinaryNode) => {
+export const extractGroupMetadata = (result: BinaryNode, phoneCache?: LidPhoneCache) => {
 	const group = getBinaryNodeChild(result, 'group')
 	if (!group) {
-		// Mirror WAWeb: surface server/client errors with their code+text instead of crashing.
+
 		const errorNode = getBinaryNodeChild(result, 'error')
 		if (errorNode) {
 			const code = errorNode.attrs.code ? +errorNode.attrs.code : 500
@@ -543,6 +580,13 @@ export const extractGroupMetadata = (result: BinaryNode) => {
 		participants: getBinaryNodeChildren(group, 'participant').map(({ attrs }) => {
 			const isLid = isLidUser(attrs.jid)
 			const hasPn = isPnUser(attrs.phone_number)
+
+			if (isLid && hasPn) {
+				phoneCache?.set(attrs.jid, attrs.phone_number)
+			} else if (isPnUser(attrs.jid) && isLidUser(attrs.lid)) {
+				phoneCache?.set(attrs.lid, attrs.jid)
+			}
+
 			return {
 				id: isLid && hasPn ? attrs.phone_number! : attrs.jid!,
 				phoneNumber: isLid && hasPn ? attrs.phone_number : undefined,
@@ -557,3 +601,7 @@ export const extractGroupMetadata = (result: BinaryNode) => {
 }
 
 export type GroupsSocket = ReturnType<typeof makeGroupsSocket>
+
+
+
+
