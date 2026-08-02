@@ -9,6 +9,7 @@ import {
 } from '../Types'
 import { generateMessageID, generateMessageIDV2, unixTimestampSeconds } from '../Utils'
 import logger from '../Utils/logger'
+import type { LIDMappingStore } from '../Signal/lid-mapping'
 import {
 	type BinaryNode,
 	getBinaryNodeChild,
@@ -17,13 +18,46 @@ import {
 	isLidUser,
 	isPnUser,
 	jidEncode,
-	jidNormalizedUser
+	jidNormalizedUser,
+	type LidPhoneCache
 } from '../WABinary'
 import { makeBusinessSocket } from './business'
 
+const resolveParticipantsLID = async (metadataList: GroupMetadata[], lidMapping: LIDMappingStore) => {
+	const unresolvedLids = new Set<string>()
+	for (const meta of metadataList) {
+		for (const p of meta.participants) {
+			if (!p.phoneNumber && isLidUser(p.id)) {
+				unresolvedLids.add(p.id)
+			}
+		}
+	}
+
+	if (unresolvedLids.size === 0) {
+		return
+	}
+
+	const resolved = await lidMapping.getPNsForLIDs([...unresolvedLids])
+	if (!resolved?.length) {
+		return
+	}
+
+	const lidToPn = new Map(resolved.map(({ lid, pn }) => [lid, pn]))
+	for (const meta of metadataList) {
+		meta.participants = meta.participants.map(p => {
+			const pn = lidToPn.get(p.id)
+			if (!pn) {
+				return p
+			}
+
+			return { ...p, id: pn, phoneNumber: pn, lid: p.id }
+		})
+	}
+}
+
 export const makeCommunitiesSocket = (config: SocketConfig) => {
 	const sock = makeBusinessSocket(config)
-	const { authState, ev, query, upsertMessage } = sock
+	const { authState, ev, query, upsertMessage, signalRepository } = sock
 
 	const communityQuery = async (jid: string, type: 'get' | 'set', content: BinaryNode[]) =>
 		query({
@@ -38,7 +72,21 @@ export const makeCommunitiesSocket = (config: SocketConfig) => {
 
 	const communityMetadata = async (jid: string) => {
 		const result = await communityQuery(jid, 'get', [{ tag: 'query', attrs: { request: 'interactive' } }])
-		return extractCommunityMetadata(result)
+		const meta = extractCommunityMetadata(result, signalRepository.lidMapping.phoneCache)
+		await resolveParticipantsLID([meta], signalRepository.lidMapping)
+		return meta
+	}
+
+	const resolveCommunityLidPhone = async (communityJid: string, lid: string): Promise<string | undefined> => {
+		const cached = signalRepository.lidMapping.phoneCache.getPhoneForLid(lid)
+		if (cached) return cached
+
+		try {
+			await communityMetadata(communityJid)
+			return signalRepository.lidMapping.phoneCache.getPhoneForLid(lid)
+		} catch {
+			return undefined
+		}
 	}
 
 	const communityFetchAllParticipating = async () => {
@@ -65,14 +113,19 @@ export const makeCommunitiesSocket = (config: SocketConfig) => {
 		if (communitiesChild) {
 			const communities = getBinaryNodeChildren(communitiesChild, 'community')
 			for (const communityNode of communities) {
-				const meta = extractCommunityMetadata({
-					tag: 'result',
-					attrs: {},
-					content: [communityNode]
-				})
+				const meta = extractCommunityMetadata(
+					{
+						tag: 'result',
+						attrs: {},
+						content: [communityNode]
+					},
+					signalRepository.lidMapping.phoneCache
+				)
 				data[meta.id] = meta
 			}
 		}
+
+		await resolveParticipantsLID(Object.values(data), signalRepository.lidMapping)
 
 		sock.ev.emit('groups.update', Object.values(data))
 
@@ -88,7 +141,7 @@ export const makeCommunitiesSocket = (config: SocketConfig) => {
 				const metadata = await sock.groupMetadata(`${groupNode.attrs.id}@g.us`)
 				return metadata ? metadata : Optional.empty()
 			} catch (error) {
-				console.error('Error parsing group metadata:', error)
+				logger.error({ error }, 'Error parsing group metadata')
 				return Optional.empty()
 			}
 		}
@@ -114,6 +167,7 @@ export const makeCommunitiesSocket = (config: SocketConfig) => {
 	return {
 		...sock,
 		communityMetadata,
+		resolveCommunityLidPhone,
 		communityCreate: async (subject: string, body: string) => {
 			const descriptionId = generateMessageID().substring(0, 12)
 
@@ -217,17 +271,13 @@ export const makeCommunitiesSocket = (config: SocketConfig) => {
 			let communityJid = jid
 			let isCommunity = false
 
-			// Try to determine if it is a subgroup or a community
 			const metadata = await sock.groupMetadata(jid)
 			if (metadata.linkedParent) {
-				// It is a subgroup, get the community jid
 				communityJid = metadata.linkedParent
 			} else {
-				// It is a community
 				isCommunity = true
 			}
 
-			// Fetch all subgroups of the community
 			const result = await communityQuery(communityJid, 'get', [{ tag: 'sub_groups', attrs: {} }])
 
 			const linkedGroupsData = []
@@ -334,12 +384,6 @@ export const makeCommunitiesSocket = (config: SocketConfig) => {
 			return result?.attrs.jid
 		},
 
-		/**
-		 * revoke a v4 invite for someone
-		 * @param communityJid community jid
-		 * @param invitedJid jid of person you invited
-		 * @returns true if successful
-		 */
 		communityRevokeInviteV4: async (communityJid: string, invitedJid: string) => {
 			const result = await communityQuery(communityJid, 'set', [
 				{ tag: 'revoke', attrs: {}, content: [{ tag: 'participant', attrs: { jid: invitedJid } }] }
@@ -347,11 +391,6 @@ export const makeCommunitiesSocket = (config: SocketConfig) => {
 			return !!result
 		},
 
-		/**
-		 * accept a CommunityInviteMessage
-		 * @param key the key of the invite message, or optionally only provide the jid of the person who sent the invite
-		 * @param inviteMessage the message to accept
-		 */
 		communityAcceptInviteV4: ev.createBufferedFunction(
 			async (key: string | WAMessageKey, inviteMessage: proto.Message.IGroupInviteMessage) => {
 				key = typeof key === 'string' ? { remoteJid: key } : key
@@ -366,10 +405,7 @@ export const makeCommunitiesSocket = (config: SocketConfig) => {
 					}
 				])
 
-				// if we have the full message key
-				// update the invite message to be expired
 				if (key.id) {
-					// create new invite message that is expired
 					inviteMessage = proto.Message.GroupInviteMessage.fromObject(inviteMessage)
 					inviteMessage.inviteExpiration = 0
 					inviteMessage.inviteCode = ''
@@ -385,14 +421,13 @@ export const makeCommunitiesSocket = (config: SocketConfig) => {
 					])
 				}
 
-				// generate the community add message
 				await upsertMessage(
 					{
 						key: {
 							remoteJid: inviteMessage.groupJid,
 							id: generateMessageIDV2(sock.user?.id),
 							fromMe: false,
-							participant: key.remoteJid // TODO: investigate if this makes any sense at all
+							participant: key.remoteJid
 						},
 						messageStubType: WAMessageStubType.GROUP_PARTICIPANT_ADD,
 						messageStubParameters: [JSON.stringify(authState.creds.me)],
@@ -407,7 +442,7 @@ export const makeCommunitiesSocket = (config: SocketConfig) => {
 		),
 		communityGetInviteInfo: async (code: string) => {
 			const results = await communityQuery('@g.us', 'get', [{ tag: 'invite', attrs: { code } }])
-			return extractCommunityMetadata(results)
+			return extractCommunityMetadata(results, signalRepository.lidMapping.phoneCache)
 		},
 		communityToggleEphemeral: async (jid: string, ephemeralExpiration: number) => {
 			const content: BinaryNode = ephemeralExpiration
@@ -433,7 +468,7 @@ export const makeCommunitiesSocket = (config: SocketConfig) => {
 	}
 }
 
-export const extractCommunityMetadata = (result: BinaryNode) => {
+export const extractCommunityMetadata = (result: BinaryNode, phoneCache?: LidPhoneCache) => {
 	const community = getBinaryNodeChild(result, 'community')!
 	const descChild = getBinaryNodeChild(community, 'description')
 	let desc: string | undefined
@@ -468,6 +503,13 @@ export const extractCommunityMetadata = (result: BinaryNode) => {
 		participants: getBinaryNodeChildren(community, 'participant').map(({ attrs }) => {
 			const isLid = isLidUser(attrs.jid)
 			const hasPn = isPnUser(attrs.phone_number)
+
+			if (isLid && hasPn) {
+				phoneCache?.set(attrs.jid, attrs.phone_number)
+			} else if (isPnUser(attrs.jid) && isLidUser(attrs.lid)) {
+				phoneCache?.set(attrs.lid, attrs.jid)
+			}
+
 			return {
 				id: isLid && hasPn ? attrs.phone_number! : attrs.jid!,
 				phoneNumber: isLid && hasPn ? attrs.phone_number : undefined,
@@ -479,4 +521,5 @@ export const extractCommunityMetadata = (result: BinaryNode) => {
 		addressingMode: getBinaryNodeChildString(community, 'addressing_mode')! as GroupMetadata['addressingMode']
 	}
 	return metadata
-}
+				}
+						
