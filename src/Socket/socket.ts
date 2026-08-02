@@ -1,5 +1,6 @@
-import { Boom } from '@hapi/boom'
+import { Boom } from '@neykoor/boom'
 import { randomBytes } from 'crypto'
+import { keyhelper, wipeBuffer } from 'libsignal'
 import { URL } from 'url'
 import { promisify } from 'util'
 import { proto } from '../../WAProto/index.js'
@@ -28,6 +29,7 @@ import {
 	bindWaitForConnectionUpdate,
 	buildPairingQRData,
 	bytesToCrockford,
+	clearWaWebVersionCache,
 	configureSuccessfulPairing,
 	Curve,
 	derivePairingCodeKey,
@@ -41,9 +43,11 @@ import {
 	makeEventBuffer,
 	makeNoiseHandler,
 	promiseTimeout,
+	resolveWaWebVersion,
 	signedKeyPair,
 	xmppSignedPreKey
 } from '../Utils'
+import { printWaVersionNotice } from '../Utils/banner'
 import {
 	assertNodeErrorFree,
 	type BinaryNode,
@@ -132,6 +136,47 @@ export const makeSocket = (config: SocketConfig) => {
 		logger,
 		routingInfo: authState?.creds?.routingInfo
 	})
+
+	/**
+	 * started before the WS connect so asking WA for its current web version
+	 * overlaps with the socket coming up & costs the handshake no extra time
+	 */
+	const waWebVersionPromise = config.syncWaWebVersion
+		? resolveWaWebVersion({ logger, options: config.options, timeoutMs: connectTimeoutMs }).then(liveVersion => {
+				if (liveVersion) {
+					logger.info({ version: liveVersion }, 'resolved live WA Web version')
+				} else {
+					logger.warn({ version: config.version }, 'could not resolve live WA Web version, using configured version')
+				}
+
+				// avisarlo apenas se sepa: los bots suelen correr con logger silencioso &
+				// una versión vieja es la causa habitual de que WhatsApp rechace el vinculado
+				printWaVersionNotice({
+					version: liveVersion || config.version,
+					source: liveVersion ? 'live' : 'bundled'
+				})
+
+				return liveVersion
+			})
+		: undefined
+
+	if (!config.syncWaWebVersion) {
+		// el sync está desactivado, así que la versión es la que el bot fijó -- vale la
+		// pena mostrarla igual, ya que una versión fijada y vieja es lo que rompe el vinculado
+		printWaVersionNotice({ version: config.version, source: 'pinned' })
+	}
+
+	/** connect with the version WA Web is serving right now, else keep the configured one */
+	const syncWaWebVersion = async () => {
+		const liveVersion = await waWebVersionPromise
+
+		if (!liveVersion || liveVersion.join('.') === config.version?.join('.')) {
+			return
+		}
+
+		logger.info({ version: liveVersion, previousVersion: config.version }, 'synced to the live WA Web version')
+		config.version = liveVersion
+	}
 
 	const ws = new WebSocketClient(url, config)
 
@@ -251,6 +296,7 @@ export const makeSocket = (config: SocketConfig) => {
 	// Rotate our signed pre-key on server; on failure, run digest as fallback and rethrow
 	const rotateSignedPreKey = async (): Promise<void> => {
 		const newId = (creds.signedPreKey.keyId || 0) + 1
+		const oldPrivateKey = creds.signedPreKey.keyPair.private
 		const skey = await signedKeyPair(creds.signedIdentityKey, newId)
 		await query({
 			tag: 'iq',
@@ -263,8 +309,17 @@ export const makeSocket = (config: SocketConfig) => {
 				}
 			]
 		})
-		// Persist new signed pre-key in creds
 		ev.emit('creds.update', { signedPreKey: skey })
+		wipeBuffer(Buffer.from(oldPrivateKey.buffer, oldPrivateKey.byteOffset, oldPrivateKey.byteLength))
+	}
+
+	const startSignedPreKeyRotationCheck = () => {
+		signedPreKeyRotationReq = setInterval(() => {
+			const createdAtMs = (creds.signedPreKey.timestampS || 0) * 1000
+			if (keyhelper.shouldRotateSignedPreKey(createdAtMs)) {
+				rotateSignedPreKey().catch(err => logger.warn({ err }, 'failed to rotate signed pre-key'))
+			}
+		}, 60 * 60 * 1000)
 	}
 
 	const executeUSyncQuery = async (usyncQuery: USyncQuery) => {
@@ -389,6 +444,7 @@ export const makeSocket = (config: SocketConfig) => {
 	let lastDateRecv: Date
 	let epoch = 1
 	let keepAliveReq: NodeJS.Timeout
+	let signedPreKeyRotationReq: NodeJS.Timeout
 	let qrTimer: NodeJS.Timeout
 	let closed = false
 
@@ -429,6 +485,29 @@ export const makeSocket = (config: SocketConfig) => {
 		return result
 	}
 
+	let handshakeDone: () => void
+	let handshakeFailed: (err: Error) => void
+	/**
+	 * resolves once the noise handshake is over & nodes can actually reach WA.
+	 * anything sent before that is framed as a handshake message and lost
+	 */
+	const handshakePromise = new Promise<void>((resolve, reject) => {
+		handshakeDone = resolve
+		handshakeFailed = reject
+	})
+	// nobody may be waiting on it when the connection dies
+	handshakePromise.catch(() => {})
+
+	const waitForHandshake = async () => {
+		if (ws.isClosed || ws.isClosing) {
+			throw new Boom('Connection Closed', { statusCode: DisconnectReason.connectionClosed })
+		}
+
+		await promiseTimeout<void>(connectTimeoutMs, (resolve, reject) => {
+			handshakePromise.then(() => resolve(), reject)
+		})
+	}
+
 	/** connection handshake */
 	const validateConnection = async () => {
 		let helloMsg: proto.IHandshakeMessage = {
@@ -446,6 +525,9 @@ export const makeSocket = (config: SocketConfig) => {
 		logger.trace({ handshake }, 'handshake recv from WA')
 
 		const keyEnc = noise.processHandshake(handshake, creds.noiseKey)
+
+		// the payload below announces the client version, so settle it first
+		await syncWaWebVersion()
 
 		let node: proto.IClientPayload
 		if (!creds.me) {
@@ -467,6 +549,8 @@ export const makeSocket = (config: SocketConfig) => {
 		)
 		await noise.finishInit()
 		startKeepAliveRequest()
+		startSignedPreKeyRotationCheck()
+		handshakeDone()
 	}
 
 	const getAvailablePreKeysOnServer = async () => {
@@ -633,7 +717,16 @@ export const makeSocket = (config: SocketConfig) => {
 		closed = true
 		logger.info({ trace: error?.stack }, error ? 'connection errored' : 'connection closed')
 
+		// a 405 means WA turned down the version we announced, so never reuse it
+		if (error instanceof Boom && error.output?.statusCode === 405) {
+			clearWaWebVersionCache()
+		}
+
+		// fail whoever is waiting on the handshake instead of leaving them hanging
+		handshakeFailed(error || new Boom('Connection Closed', { statusCode: DisconnectReason.connectionClosed }))
+
 		clearInterval(keepAliveReq)
+		clearInterval(signedPreKeyRotationReq)
 		clearTimeout(qrTimer)
 
 		ws.removeAllListeners('close')
@@ -762,17 +855,28 @@ export const makeSocket = (config: SocketConfig) => {
 	}
 
 	const requestPairingCode = async (phoneNumber: string, customPairingCode?: string): Promise<string> => {
-		// Código de vinculación fijo, sin sufijo aleatorio.
-		const pairingCode = customPairingCode ?? 'ASTABOTS'
+		const pairingCode = customPairingCode ?? bytesToCrockford(randomBytes(5))
 
 		if (customPairingCode && customPairingCode?.length !== 8) {
 			throw new Error('Custom pairing code must be exactly 8 chars')
 		}
 
+		const digitsOnly = phoneNumber.replace(/\D/g, '')
+		if (!digitsOnly) {
+			throw new Boom('Phone number must contain digits, with the country code & no +, spaces or dashes', {
+				statusCode: 400
+			})
+		}
+
+		// the code is generated here, but only becomes valid once WA receives the node
+		// below -- sending it before the handshake is over would silently lose it & the
+		// phone would reject the code the user is looking at
+		await waitForHandshake()
+
 		authState.creds.pairingCode = pairingCode
 
 		authState.creds.me = {
-			id: jidEncode(phoneNumber, 's.whatsapp.net'),
+			id: jidEncode(digitsOnly, 's.whatsapp.net'),
 			name: '~'
 		}
 		ev.emit('creds.update', authState.creds)
