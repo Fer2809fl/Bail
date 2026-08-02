@@ -1,8 +1,8 @@
-import { Boom } from '@hapi/boom'
+import { Boom } from '@neykoor/boom'
 import { proto } from '../../WAProto/index.js'
 import { type BinaryNode } from './types'
 
-// some extra useful utilities
+
 
 const indexCache = new WeakMap<BinaryNode, Map<string, BinaryNode[]>>()
 
@@ -11,7 +11,7 @@ export const getBinaryNodeChildren = (node: BinaryNode | undefined, childTag: st
 
 	let index = indexCache.get(node)
 
-	// Build the index once per node
+	
 	if (!index) {
 		index = new Map<string, BinaryNode[]>()
 
@@ -24,7 +24,7 @@ export const getBinaryNodeChildren = (node: BinaryNode | undefined, childTag: st
 		indexCache.set(node, index)
 	}
 
-	// Return first matching child
+
 	return index.get(childTag) || []
 }
 
