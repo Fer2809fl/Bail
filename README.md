@@ -1,38 +1,38 @@
 <div align="center">
 
-# ‚ö° ASTA-BOTS
+# ? ASTA-BOTS
 
-### Librer√≠a de WhatsApp Web para bots, en TypeScript
+### Librer®™a de WhatsApp Web para bots, en TypeScript
 
 ![Node](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![TypeScript](https://img.shields.io/badge/-TypeScript-3178C6?logo=typescript&logoColor=white)
-![ASTA-BOTS](https://img.shields.io/badge/‚ö°-ASTA--BOTS-00FFFF)
+![ASTA-BOTS](https://img.shields.io/badge/?-ASTA--BOTS-00FFFF)
 
 </div>
 
 <br/>
 
 > [!NOTE]
-> ASTA-BOTS no requiere Selenium, Puppeteer ni ning√∫n navegador para funcionar. Se conecta directamente a WhatsApp Web mediante un **WebSocket**, lo que la hace mucho m√°s liviana en consumo de RAM y CPU en comparaci√≥n con soluciones basadas en navegador.
+> ASTA-BOTS no requiere Selenium, Puppeteer ni ning®≤n navegador para funcionar. Se conecta directamente a WhatsApp Web mediante un **WebSocket**, lo que la hace mucho m®¢s liviana en consumo de RAM y CPU en comparaci®Æn con soluciones basadas en navegador.
 
-## √çndice
+## ?ndice
 
-- [¬øQu√© es ASTA-BOTS?](#qu√©-es-asta-bots)
-- [Caracter√≠sticas](#caracter√≠sticas)
-- [Instalaci√≥n](#instalaci√≥n)
-- [Inicio r√°pido](#inicio-r√°pido)
-  - [Vinculaci√≥n de la cuenta](#vinculaci√≥n-de-la-cuenta)
+- [?Qu®¶ es ASTA-BOTS?](#qu®¶-es-asta-bots)
+- [Caracter®™sticas](#caracter®™sticas)
+- [Instalaci®Æn](#instalaci®Æn)
+- [Inicio r®¢pido](#inicio-r®¢pido)
+  - [Vinculaci®Æn de la cuenta](#vinculaci®Æn-de-la-cuenta)
   - [Guardado de credenciales](#guardado-de-credenciales)
-- [M√©todos de mensajer√≠a](#m√©todos-de-mensajer√≠a)
-  - [`sendMessage`](#sendmessage-el-m√©todo-principal)
+- [M®¶todos de mensajer®™a](#m®¶todos-de-mensajer®™a)
+  - [`sendMessage`](#sendmessage-el-m®¶todo-principal)
   - [Mensajes de texto](#mensajes-de-texto)
   - [Mensajes multimedia](#mensajes-multimedia)
   - [Procesar medios sin enviarlos](#procesar-medios-sin-enviarlos)
-  - [Ubicaci√≥n y contactos](#ubicaci√≥n-y-contactos)
+  - [Ubicaci®Æn y contactos](#ubicaci®Æn-y-contactos)
   - [Encuestas, reacciones y respuestas a botones](#encuestas-reacciones-y-respuestas-a-botones)
   - [Botones, listas, templates y carousel](#botones-listas-templates-y-carousel)
-  - [Mensajes crudos (smgss): pagos, productos, √°lbumes, eventos y m√°s](#mensajes-crudos-smgss-pagos-productos-√°lbumes-eventos-y-m√°s)
+  - [Mensajes crudos (smgss): pagos, productos, ®¢lbumes, eventos y m®¢s](#mensajes-crudos-smgss-pagos-productos-®¢lbumes-eventos-y-m®¢s)
   - [Mensajes "raw" (proto armado a mano)](#mensajes-raw-proto-armado-a-mano)
   - [Editar, eliminar, reenviar y fijar](#editar-eliminar-reenviar-y-fijar)
   - [Mensajes enriquecidos](#mensajes-enriquecidos)
@@ -41,42 +41,42 @@
   - [Recibos, lectura y presencia](#recibos-lectura-y-presencia)
 - [Grupos, comunidades y canales](#grupos-comunidades-y-canales)
 - [Perfil, privacidad y negocios](#perfil-privacidad-y-negocios)
-- [Store (cach√© en memoria)](#store-cach√©-en-memoria)
+- [Store (cach®¶ en memoria)](#store-cach®¶-en-memoria)
 - [Utilidades ASTA-BOTS](#utilidades-asta-bots)
-  - [`resolveJid`: resoluci√≥n autom√°tica de JID](#resolvejid-resoluci√≥n-autom√°tica-de-jid)
+  - [`resolveJid`: resoluci®Æn autom®¢tica de JID](#resolvejid-resoluci®Æn-autom®¢tica-de-jid)
   - [Sistema de botones de conveniencia](#sistema-de-botones-de-conveniencia)
-  - [C√≥digo de vinculaci√≥n de marca](#c√≥digo-de-vinculaci√≥n-de-marca)
+  - [C®Ædigo de vinculaci®Æn de marca](#c®Ædigo-de-vinculaci®Æn-de-marca)
 - [Aviso legal](#aviso-legal)
-- [Cr√©ditos](#cr√©ditos)
+- [Cr®¶ditos](#cr®¶ditos)
 
-## ¬øQu√© es ASTA-BOTS?
+## ?Qu®¶ es ASTA-BOTS?
 
-**ASTA-BOTS** es una librer√≠a para conectarse a WhatsApp Web de forma directa, sin depender de un navegador ni de librer√≠as de automatizaci√≥n como Selenium o Puppeteer. Toda la comunicaci√≥n con WhatsApp ocurre a trav√©s de un **WebSocket**, tal como lo hace la propia versi√≥n web de WhatsApp, lo que se traduce en una librer√≠a r√°pida y liviana en recursos.
+**ASTA-BOTS** es una librer®™a para conectarse a WhatsApp Web de forma directa, sin depender de un navegador ni de librer®™as de automatizaci®Æn como Selenium o Puppeteer. Toda la comunicaci®Æn con WhatsApp ocurre a trav®¶s de un **WebSocket**, tal como lo hace la propia versi®Æn web de WhatsApp, lo que se traduce en una librer®™a r®¢pida y liviana en recursos.
 
-Es un fork de **Baileys**, y conserva casi toda su base: el protocolo, el cifrado, la arquitectura del socket y el manejo de credenciales. Adem√°s, incorpora algunos m√©todos para enviar mensajes con contenido enriquecido (tablas, listas, c√≥digo y LaTeX), botones/listas/carousel nativos de WhatsApp, un dispatcher para contenido avanzado (pagos, productos, √°lbumes, eventos), y utilidades propias de **ASTA-BOTS** para resoluci√≥n autom√°tica de JID y botones de conveniencia ‚Äî m√°s detalle en las secciones correspondientes.
+Es un fork de **Baileys**, y conserva casi toda su base: el protocolo, el cifrado, la arquitectura del socket y el manejo de credenciales. Adem®¢s, incorpora algunos m®¶todos para enviar mensajes con contenido enriquecido (tablas, listas, c®Ædigo y LaTeX), botones/listas/carousel nativos de WhatsApp, un dispatcher para contenido avanzado (pagos, productos, ®¢lbumes, eventos), y utilidades propias de **ASTA-BOTS** para resoluci®Æn autom®¢tica de JID y botones de conveniencia °™ m®¢s detalle en las secciones correspondientes.
 
-Este README est√° enfocado principalmente en explicar **c√≥mo enviar cada tipo de mensaje**, ya que es lo que m√°s se necesita a la hora de integrar la librer√≠a en un proyecto real.
+Este README est®¢ enfocado principalmente en explicar **c®Æmo enviar cada tipo de mensaje**, ya que es lo que m®¢s se necesita a la hora de integrar la librer®™a en un proyecto real.
 
-## Caracter√≠sticas
+## Caracter®™sticas
 
-- üîå Conexi√≥n directa por WebSocket, sin navegador de por medio.
-- üí¨ Env√≠o de todo tipo de mensajes: texto, im√°genes, video, audio, notas de voz, documentos, stickers, ubicaci√≥n, contactos, encuestas y m√°s.
-- üîò Botones, listas de selecci√≥n, templates y carousel (interactive/native_flow), con el nodo `biz` necesario para que WhatsApp los acepte y renderice.
-- ‚ö° **Resoluci√≥n autom√°tica de JID** (`resolveJid`): detecta el destinatario de un comando por citado, menci√≥n o argumento, sin pasar el n√∫mero a mano.
-- ‚ö° **Helpers de botones listos para usar** (`sendQuickReplyButtons`, `sendUrlButton`, `sendListMenu`, etc.) y un detector de respuestas de bot√≥n (`setupButtonHandler`) para enrutarlas directo a tus comandos.
-- üí≥ Contenido avanzado v√≠a `smgss`: pedidos de pago, cards de producto, √°lbumes, eventos, resultados de encuesta e historias por grupo.
-- üñºÔ∏è Procesamiento de medios (`resize`, `convert`, `toSticker`, `compress`, `metadata`) sobre cualquier `Buffer`, sin necesidad de enviarlo.
-- üõ†Ô∏è Salida de emergencia `raw: true` para mandar un mensaje armado a mano cuando ning√∫n builder alcanza.
-- üß© M√©todos para enviar mensajes enriquecidos: tablas, listas, c√≥digo y LaTeX.
-- ü§ñ Marca de "generado por IA" en mensajes de chats individuales.
-- üì∏ Publicaci√≥n de estados (historias) con notificaci√≥n por menciones, tanto a contactos individuales como a grupos.
-- üë• Administraci√≥n completa de grupos, comunidades y canales de difusi√≥n.
-- üîê 2 m√©todos de vinculaci√≥n: c√≥digo QR o c√≥digo de emparejamiento (con c√≥digo de marca **`ASTABOTS`** por defecto).
-- üóÇÔ∏è 3 formas de guardar credenciales: por archivos m√∫ltiples, un solo archivo o SQLite.
+- ? Conexi®Æn directa por WebSocket, sin navegador de por medio.
+- ? Env®™o de todo tipo de mensajes: texto, im®¢genes, video, audio, notas de voz, documentos, stickers, ubicaci®Æn, contactos, encuestas y m®¢s.
+- ? Botones, listas de selecci®Æn, templates y carousel (interactive/native_flow), con el nodo `biz` necesario para que WhatsApp los acepte y renderice.
+- ? **Resoluci®Æn autom®¢tica de JID** (`resolveJid`): detecta el destinatario de un comando por citado, menci®Æn o argumento, sin pasar el n®≤mero a mano.
+- ? **Helpers de botones listos para usar** (`sendQuickReplyButtons`, `sendUrlButton`, `sendListMenu`, etc.) y un detector de respuestas de bot®Æn (`setupButtonHandler`) para enrutarlas directo a tus comandos.
+- ? Contenido avanzado v®™a `smgss`: pedidos de pago, cards de producto, ®¢lbumes, eventos, resultados de encuesta e historias por grupo.
+- ?? Procesamiento de medios (`resize`, `convert`, `toSticker`, `compress`, `metadata`) sobre cualquier `Buffer`, sin necesidad de enviarlo.
+- ?? Salida de emergencia `raw: true` para mandar un mensaje armado a mano cuando ning®≤n builder alcanza.
+- ? M®¶todos para enviar mensajes enriquecidos: tablas, listas, c®Ædigo y LaTeX.
+- ? Marca de "generado por IA" en mensajes de chats individuales.
+- ? Publicaci®Æn de estados (historias) con notificaci®Æn por menciones, tanto a contactos individuales como a grupos.
+- ? Administraci®Æn completa de grupos, comunidades y canales de difusi®Æn.
+- ? 2 m®¶todos de vinculaci®Æn: c®Ædigo QR o c®Ædigo de emparejamiento (con c®Ædigo de marca **`ASTABOTS`** por defecto).
+- ?? 3 formas de guardar credenciales: por archivos m®≤ltiples, un solo archivo o SQLite.
 
-## Instalaci√≥n
+## Instalaci®Æn
 
-Instalaci√≥n directa desde GitHub:
+Instalaci®Æn directa desde GitHub:
 
 ```bash
 npm install github:TU-USUARIO/asta-bots
@@ -92,15 +92,15 @@ Una vez instalada, importala en tu proyecto:
 import makeWASocket from 'baileys'
 ```
 
-## Inicio r√°pido
+## Inicio r®¢pido
 
-Para conectar una cuenta de WhatsApp a ASTA-BOTS hacen falta dos cosas: **c√≥mo se guardan las credenciales de la sesi√≥n** y **c√≥mo se vincula el dispositivo** (que puede ser con c√≥digo QR o con c√≥digo de emparejamiento).
+Para conectar una cuenta de WhatsApp a ASTA-BOTS hacen falta dos cosas: **c®Æmo se guardan las credenciales de la sesi®Æn** y **c®Æmo se vincula el dispositivo** (que puede ser con c®Ædigo QR o con c®Ædigo de emparejamiento).
 
-### Vinculaci√≥n de la cuenta
+### Vinculaci®Æn de la cuenta
 
-ASTA-BOTS soporta los **2 m√©todos de vinculaci√≥n** que ofrece WhatsApp:
+ASTA-BOTS soporta los **2 m®¶todos de vinculaci®Æn** que ofrece WhatsApp:
 
-#### 1. Con c√≥digo QR
+#### 1. Con c®Ædigo QR
 
 ```ts
 import makeWASocket, { useMultiFileAuthState } from 'baileys'
@@ -123,9 +123,9 @@ async function iniciar() {
 iniciar()
 ```
 
-Al iniciar, se imprime un c√≥digo QR en la terminal que hay que escanear desde WhatsApp (Dispositivos vinculados ‚Üí Vincular un dispositivo).
+Al iniciar, se imprime un c®Ædigo QR en la terminal que hay que escanear desde WhatsApp (Dispositivos vinculados °˙ Vincular un dispositivo).
 
-#### 2. Con c√≥digo de emparejamiento
+#### 2. Con c®Ædigo de emparejamiento
 
 ```ts
 const sock = makeWASocket({
@@ -134,21 +134,21 @@ const sock = makeWASocket({
 })
 
 if (!sock.authState?.creds?.registered) {
-  const codigo = await sock.requestPairingCode('5215512345678') // n√∫mero con c√≥digo de pa√≠s, sin +
-  console.log('Tu c√≥digo de emparejamiento es:', codigo)
+  const codigo = await sock.requestPairingCode('5215512345678') // n®≤mero con c®Ædigo de pa®™s, sin +
+  console.log('Tu c®Ædigo de emparejamiento es:', codigo)
 }
 ```
 
-En este caso, en vez de escanear un QR, WhatsApp te muestra en el celular un c√≥digo de 8 caracteres que hay que ingresar desde la opci√≥n "Vincular con n√∫mero de tel√©fono".
+En este caso, en vez de escanear un QR, WhatsApp te muestra en el celular un c®Ædigo de 8 caracteres que hay que ingresar desde la opci®Æn "Vincular con n®≤mero de tel®¶fono".
 
 ### Guardado de credenciales
 
-Una vez vinculada la cuenta, ASTA-BOTS necesita persistir las credenciales para no tener que volver a escanear el QR o pedir el c√≥digo cada vez. Hay **3 formas** de hacerlo, todas exportadas por la librer√≠a:
+Una vez vinculada la cuenta, ASTA-BOTS necesita persistir las credenciales para no tener que volver a escanear el QR o pedir el c®Ædigo cada vez. Hay **3 formas** de hacerlo, todas exportadas por la librer®™a:
 
-| M√©todo | C√≥mo guarda los datos | Cu√°ndo conviene |
+| M®¶todo | C®Æmo guarda los datos | Cu®¢ndo conviene |
 |---|---|---|
 | `useMultiFileAuthState('carpeta')` | Un archivo por cada clave, dentro de una carpeta | Uso por defecto, ideal para desarrollo y bots simples |
-| `useSingleFileAuthState('archivo.json')` | Todo en un √∫nico archivo JSON | Cuando quer√©s portar la sesi√≥n f√°cilmente como un solo archivo |
+| `useSingleFileAuthState('archivo.json')` | Todo en un ®≤nico archivo JSON | Cuando quer®¶s portar la sesi®Æn f®¢cilmente como un solo archivo |
 | `useSqliteAuthState({ dbPath: 'sesion.db' })` | En una base de datos SQLite (requiere `better-sqlite3`) | Bots con mucho volumen de claves o que necesitan acceso concurrente |
 
 Ejemplo con SQLite:
@@ -162,52 +162,52 @@ const sock = makeWASocket({ auth: state })
 sock.ev.on('creds.update', saveCreds)
 ```
 
-## M√©todos de mensajer√≠a
+## M®¶todos de mensajer®™a
 
-Todos los m√©todos de env√≠o viven dentro del objeto `sock` que devuelve `makeWASocket()`. La firma general es siempre parecida: reciben el **JID** (identificador del chat) y el contenido del mensaje.
+Todos los m®¶todos de env®™o viven dentro del objeto `sock` que devuelve `makeWASocket()`. La firma general es siempre parecida: reciben el **JID** (identificador del chat) y el contenido del mensaje.
 
-Formatos de JID m√°s comunes:
+Formatos de JID m®¢s comunes:
 
 | Tipo de chat | Formato de JID |
 |---|---|
 | Contacto individual | `5215512345678@s.whatsapp.net` |
 | Grupo | `1234567890@g.us` |
-| Canal de difusi√≥n (newsletter) | `1234567890@newsletter` |
+| Canal de difusi®Æn (newsletter) | `1234567890@newsletter` |
 | Estado (historia) | `status@broadcast` |
 | Identificador LID | `123456789@lid` |
 
-> **¬øQu√© es un LID?** Es un identificador que WhatsApp usa como capa de privacidad: en ciertos contextos (por ejemplo, dentro de comunidades) un contacto no se identifica con su n√∫mero de tel√©fono (`@s.whatsapp.net`) sino con un `@lid`, un ID que no revela el n√∫mero real. ASTA-BOTS mantiene internamente una tabla de equivalencias entre el LID y el n√∫mero de tel√©fono real (`LIDMappingStore`) para poder cifrar y enviar los mensajes correctamente sin que tengas que hacer nada manualmente. Si necesit√°s revisarlo, `isLidUser(jid)` te dice si un JID es de tipo LID.
+> **?Qu®¶ es un LID?** Es un identificador que WhatsApp usa como capa de privacidad: en ciertos contextos (por ejemplo, dentro de comunidades) un contacto no se identifica con su n®≤mero de tel®¶fono (`@s.whatsapp.net`) sino con un `@lid`, un ID que no revela el n®≤mero real. ASTA-BOTS mantiene internamente una tabla de equivalencias entre el LID y el n®≤mero de tel®¶fono real (`LIDMappingStore`) para poder cifrar y enviar los mensajes correctamente sin que tengas que hacer nada manualmente. Si necesit®¢s revisarlo, `isLidUser(jid)` te dice si un JID es de tipo LID.
 
-### `sendMessage` ‚Äî el m√©todo principal
+### `sendMessage` °™ el m®¶todo principal
 
 ```ts
 await sock.sendMessage(jid, contenido, opciones)
 ```
 
 - **`jid`** *(string)*: destinatario del mensaje (contacto, grupo, canal o `status@broadcast` para estados).
-- **`contenido`** *(`AnyMessageContent`)*: define qu√© tipo de mensaje se env√≠a (texto, imagen, video, encuesta, botones, etc. ‚Äî ver detalle abajo).
+- **`contenido`** *(`AnyMessageContent`)*: define qu®¶ tipo de mensaje se env®™a (texto, imagen, video, encuesta, botones, etc. °™ ver detalle abajo).
 - **`opciones`** *(`MiscMessageGenerationOptions`, opcional)*: permite, entre otras cosas:
   - `quoted`: el mensaje al que se responde (citar).
   - `messageId`: forzar un ID de mensaje propio.
-  - `ephemeralExpiration`: duraci√≥n de los mensajes ef√≠meros.
-  - `mediaUploadTimeoutMs`: tiempo m√°ximo para subir archivos.
+  - `ephemeralExpiration`: duraci®Æn de los mensajes ef®™meros.
+  - `mediaUploadTimeoutMs`: tiempo m®¢ximo para subir archivos.
 
-Todos los m√©todos de env√≠o devuelven una promesa que se resuelve con el mensaje ya construido y enviado (`WAMessage`), el cual pod√©s guardar para citarlo, editarlo o eliminarlo m√°s adelante.
+Todos los m®¶todos de env®™o devuelven una promesa que se resuelve con el mensaje ya construido y enviado (`WAMessage`), el cual pod®¶s guardar para citarlo, editarlo o eliminarlo m®¢s adelante.
 
-El resto de los m√©todos de esta secci√≥n (`sendTable`, `sendList`, `sendCodeBlock`, etc.) son en realidad **atajos**: por debajo construyen el `contenido` correcto y llaman a `relayMessage` por vos, para que no tengas que armar la estructura del mensaje a mano.
+El resto de los m®¶todos de esta secci®Æn (`sendTable`, `sendList`, `sendCodeBlock`, etc.) son en realidad **atajos**: por debajo construyen el `contenido` correcto y llaman a `relayMessage` por vos, para que no tengas que armar la estructura del mensaje a mano.
 
-> Si el `contenido` incluye botones, lista, template o carousel, `sendMessage` agrega autom√°ticamente el nodo `biz` que WhatsApp exige para aceptarlos y renderizarlos ‚Äî no hace falta que hagas nada extra para eso.
+> Si el `contenido` incluye botones, lista, template o carousel, `sendMessage` agrega autom®¢ticamente el nodo `biz` que WhatsApp exige para aceptarlos y renderizarlos °™ no hace falta que hagas nada extra para eso.
 
 ### Mensajes de texto
 
 ```ts
-await sock.sendMessage(jid, { text: 'Hola, esto es ASTA-BOTS üëã' })
+await sock.sendMessage(jid, { text: 'Hola, esto es ASTA-BOTS ?' })
 ```
 
 Con vista previa de enlace desactivada:
 
 ```ts
-await sock.sendMessage(jid, { text: 'Mir√° esto: https://ejemplo.com', linkPreview: null })
+await sock.sendMessage(jid, { text: 'Mir®¢ esto: https://ejemplo.com', linkPreview: null })
 ```
 
 Citando un mensaje:
@@ -220,15 +220,15 @@ await sock.sendMessage(jid, { text: 'Respondiendo a tu mensaje' }, { quoted: men
 
 | Tipo | Campo | Ejemplo |
 |---|---|---|
-| Imagen | `image` | `{ image: { url: './foto.jpg' }, caption: 'Mir√° esto' }` |
+| Imagen | `image` | `{ image: { url: './foto.jpg' }, caption: 'Mir®¢ esto' }` |
 | Video | `video` | `{ video: { url: './video.mp4' }, caption: 'Un video', gifPlayback: false }` |
 | Nota de voz | `audio` + `ptt: true` | `{ audio: { url: './audio.mp3' }, ptt: true }` |
 | Audio normal | `audio` | `{ audio: { url: './cancion.mp3' }, mimetype: 'audio/mp4' }` |
-| Video nota (c√≠rculo) | `video` + `ptv: true` | `{ video: { url: './nota.mp4' }, ptv: true }` |
+| Video nota (c®™rculo) | `video` + `ptv: true` | `{ video: { url: './nota.mp4' }, ptv: true }` |
 | Sticker | `sticker` | `{ sticker: { url: './sticker.webp' } }` |
 | Documento | `document` | `{ document: { url: './archivo.pdf' }, mimetype: 'application/pdf', fileName: 'informe.pdf' }` |
 | Paquete de stickers | `stickerPack` | `{ stickerPack: { name: 'Mi pack', cover: {...}, stickers: [...] } }` |
-| √Ålbum (varias fotos/videos) | `album` | `{ album: { images: [...], videos: [...] } }` |
+| ?lbum (varias fotos/videos) | `album` | `{ album: { images: [...], videos: [...] } }` |
 
 Ejemplo completo:
 
@@ -243,7 +243,7 @@ await sock.sendMessage(jid, {
 
 ### Procesar medios sin enviarlos
 
-Adem√°s de enviar, el socket expone helpers para procesar im√°genes y video directamente sobre un `Buffer`, sin que eso implique mandar ning√∫n mensaje:
+Adem®¢s de enviar, el socket expone helpers para procesar im®¢genes y video directamente sobre un `Buffer`, sin que eso implique mandar ning®≤n mensaje:
 
 ```ts
 const redimensionada = await sock.resize(buffer, 512, 512, { quality: 80 })
@@ -253,12 +253,12 @@ const comprimida = await sock.compress(buffer, { quality: 50 })
 const info = await sock.metadata(buffer) // { size, mimetype, width, height, duration, ... }
 ```
 
-Usan `sharp` (si est√° instalado) y caen a `ffmpeg`/`ffprobe` para lo que `sharp` no soporta (video). No afectan la velocidad de la conexi√≥n ni del env√≠o de mensajes ‚Äî son solo utilidades de conveniencia para procesar archivos.
+Usan `sharp` (si est®¢ instalado) y caen a `ffmpeg`/`ffprobe` para lo que `sharp` no soporta (video). No afectan la velocidad de la conexi®Æn ni del env®™o de mensajes °™ son solo utilidades de conveniencia para procesar archivos.
 
-### Ubicaci√≥n y contactos
+### Ubicaci®Æn y contactos
 
 ```ts
-// Ubicaci√≥n
+// Ubicaci®Æn
 await sock.sendMessage(jid, {
   location: { degreesLatitude: 19.4326, degreesLongitude: -99.1332, name: 'CDMX' }
 })
@@ -277,48 +277,48 @@ await sock.sendMessage(jid, {
 ```ts
 // Encuesta
 await sock.sendMessage(jid, {
-  poll: { name: '¬øCu√°l prefieres?', values: ['Opci√≥n A', 'Opci√≥n B'], selectableCount: 1 }
+  poll: { name: '?Cu®¢l prefieres?', values: ['Opci®Æn A', 'Opci®Æn B'], selectableCount: 1 }
 })
 
-// Reacci√≥n a un mensaje
-await sock.sendMessage(jid, { react: { text: 'üî•', key: mensaje.key } })
+// Reacci®Æn a un mensaje
+await sock.sendMessage(jid, { react: { text: '?', key: mensaje.key } })
 
-// Respuesta a un bot√≥n / lista (uso interno al procesar interacciones)
-await sock.sendMessage(jid, { buttonReply: { displayText: 'S√≠', id: 'btn_si', index: 0 }, type: 'plain' })
+// Respuesta a un bot®Æn / lista (uso interno al procesar interacciones)
+await sock.sendMessage(jid, { buttonReply: { displayText: 'S®™', id: 'btn_si', index: 0 }, type: 'plain' })
 ```
 
 ### Botones, listas, templates y carousel
 
-ASTA-BOTS puede armar botones nativos (`native_flow`), listas de selecci√≥n, templates legados y carousel directamente desde `sock.sendMessage`, sin tener que construir el protobuf a mano. En todos los casos se agrega autom√°ticamente el nodo `biz` necesario para que WhatsApp los acepte.
+ASTA-BOTS puede armar botones nativos (`native_flow`), listas de selecci®Æn, templates legados y carousel directamente desde `sock.sendMessage`, sin tener que construir el protobuf a mano. En todos los casos se agrega autom®¢ticamente el nodo `biz` necesario para que WhatsApp los acepte.
 
-**Botones** ‚Äî soporta respuesta r√°pida (`id`), enlace (`url`), llamada (`call`), copiar texto (`copy`), una mini-lista embebida (`sections`), un flow crudo (`name` + `paramsJson`), o un bot√≥n ya armado con `nativeFlowInfo` (por ejemplo, reenviado de otro lado) ‚Äî en ese caso se respeta tal cual viene:
+**Botones** °™ soporta respuesta r®¢pida (`id`), enlace (`url`), llamada (`call`), copiar texto (`copy`), una mini-lista embebida (`sections`), un flow crudo (`name` + `paramsJson`), o un bot®Æn ya armado con `nativeFlowInfo` (por ejemplo, reenviado de otro lado) °™ en ese caso se respeta tal cual viene:
 
 ```ts
 await sock.sendMessage(jid, {
-  text: 'Eleg√≠ una opci√≥n',
+  text: 'Eleg®™ una opci®Æn',
   footer: 'Powered by ASTA-BOTS',
   buttons: [
     { text: 'Visitar sitio', url: 'https://ejemplo.com' },
     { text: 'Llamar', call: '+50488888888' },
-    { text: 'Copiar c√≥digo', copy: 'ABC123' },
+    { text: 'Copiar c®Ædigo', copy: 'ABC123' },
     { text: 'Responder', id: 'opt_1' }
   ]
 })
 ```
 
-> `buttons`/`sections`/`templateButtons`/`nativeFlow`/`cards` se eval√∫an **antes** que `text` en el armado interno del mensaje, as√≠ que combinar `text` (el cuerpo) junto con cualquiera de estos tipos funciona sin que el texto se coma al resto del contenido.
+> `buttons`/`sections`/`templateButtons`/`nativeFlow`/`cards` se eval®≤an **antes** que `text` en el armado interno del mensaje, as®™ que combinar `text` (el cuerpo) junto con cualquiera de estos tipos funciona sin que el texto se coma al resto del contenido.
 
-**Lista de selecci√≥n √∫nica:**
+**Lista de selecci®Æn ®≤nica:**
 
 ```ts
 await sock.sendMessage(jid, {
-  description: 'Eleg√≠ un producto del cat√°logo',
-  title: 'Cat√°logo',
+  description: 'Eleg®™ un producto del cat®¢logo',
+  title: 'Cat®¢logo',
   buttonText: 'Ver opciones',
   footer: 'ASTA-BOTS',
   sections: [
     {
-      title: 'Secci√≥n 1',
+      title: 'Secci®Æn 1',
       rows: [
         { title: 'Producto A', rowId: 'a' },
         { title: 'Producto B', rowId: 'b' }
@@ -328,30 +328,30 @@ await sock.sendMessage(jid, {
 })
 ```
 
-**Template buttons** (formato legado ‚Äî solo se renderiza en WhatsApp Web, Desktop e iOS):
+**Template buttons** (formato legado °™ solo se renderiza en WhatsApp Web, Desktop e iOS):
 
 ```ts
 await sock.sendMessage(jid, {
-  text: 'Confirm√° tu pedido',
+  text: 'Confirm®¢ tu pedido',
   templateButtons: [
-    { text: 'S√≠', id: 'yes' },
+    { text: 'S®™', id: 'yes' },
     { text: 'Visitar', url: 'https://ejemplo.com' },
     { text: 'Llamar', call: '+50488888888' }
   ]
 })
 ```
 
-**Interactive message gen√©rico** (`nativeFlow`), con header de imagen/video/documento:
+**Interactive message gen®¶rico** (`nativeFlow`), con header de imagen/video/documento:
 
 ```ts
 await sock.sendMessage(jid, {
   image: { url: 'https://ejemplo.com/foto.jpg' },
-  caption: 'Mir√° esto',
-  title: 'T√≠tulo',
-  subtitle: 'Subt√≠tulo',
+  caption: 'Mir®¢ esto',
+  title: 'T®™tulo',
+  subtitle: 'Subt®™tulo',
   footer: 'ASTA-BOTS',
   nativeFlow: [
-    { text: 'Ver m√°s', url: 'https://ejemplo.com' }
+    { text: 'Ver m®¢s', url: 'https://ejemplo.com' }
   ]
 })
 ```
@@ -367,19 +367,19 @@ await sock.sendMessage(jid, {
 })
 ```
 
-### Mensajes crudos (smgss): pagos, productos, √°lbumes, eventos y m√°s
+### Mensajes crudos (smgss): pagos, productos, ®¢lbumes, eventos y m®¢s
 
-Para contenido que no tiene un atajo declarativo simple, ASTA-BOTS incluye un dispatcher (`smgss`) que reconoce el contenido a partir de su forma y lo arma internamente. Se usa igual que cualquier otro contenido, pas√°ndolo directo a `sock.sendMessage(jid, contenido)`:
+Para contenido que no tiene un atajo declarativo simple, ASTA-BOTS incluye un dispatcher (`smgss`) que reconoce el contenido a partir de su forma y lo arma internamente. Se usa igual que cualquier otro contenido, pas®¢ndolo directo a `sock.sendMessage(jid, contenido)`:
 
-| Contenido | Qu√© hace |
+| Contenido | Qu®¶ hace |
 |---|---|
 | `{ requestPaymentMessage: {...} }` | Pedido de pago, con nota de texto o sticker adjunto opcional. |
-| `{ productMessage: {...} }` | Card de un producto individual (imagen, precio, descripci√≥n). |
-| `{ interactiveButtons: [...] }` | Botones declarativos con header de imagen/video/documento/ubicaci√≥n/producto. |
+| `{ productMessage: {...} }` | Card de un producto individual (imagen, precio, descripci®Æn). |
+| `{ interactiveButtons: [...] }` | Botones declarativos con header de imagen/video/documento/ubicaci®Æn/producto. |
 | `{ interactiveMessage: {...} }` | Interactive message armado a mano (media header + botones nativos propios). |
 | `{ interactiveMessage: { carouselMessage: {...} } }` | Carousel armado a mano, con cards en formato de proto crudo. |
-| `{ albumMessage: [...] }` o `{ album: [...] }` | √Ålbum: manda el contenedor y despu√©s cada foto/video asociado. |
-| `{ eventMessage: {...} }` | Evento de WhatsApp (nombre, descripci√≥n, fecha, ubicaci√≥n, link para unirse). |
+| `{ albumMessage: [...] }` o `{ album: [...] }` | ?lbum: manda el contenedor y despu®¶s cada foto/video asociado. |
+| `{ eventMessage: {...} }` | Evento de WhatsApp (nombre, descripci®Æn, fecha, ubicaci®Æn, link para unirse). |
 | `{ pollResultMessage: {...} }` | Snapshot de resultados de una encuesta. |
 | `{ groupStatusMessage: {...} }` | Historia visible solo para un grupo puntual (distinto al estado normal). |
 
@@ -388,7 +388,7 @@ Ejemplo de pedido de pago:
 ```ts
 await sock.sendMessage(jid, {
   requestPaymentMessage: {
-    amount: 50000, // en la unidad m√≠nima de la moneda (ej. centavos)
+    amount: 50000, // en la unidad m®™nima de la moneda (ej. centavos)
     currency: 'USD',
     from: '0@s.whatsapp.net',
     note: 'Pago por el servicio de este mes'
@@ -396,7 +396,7 @@ await sock.sendMessage(jid, {
 })
 ```
 
-Ejemplo de √°lbum:
+Ejemplo de ®¢lbum:
 
 ```ts
 await sock.sendMessage(jid, {
@@ -410,7 +410,7 @@ await sock.sendMessage(jid, {
 
 ### Mensajes "raw" (proto armado a mano)
 
-Para casos que ning√∫n builder cubre todav√≠a, se puede pasar el contenido del mensaje ya armado como protobuf, agregando `raw: true`. ASTA-BOTS no lo interpreta ni lo transforma ‚Äî lo manda tal cual:
+Para casos que ning®≤n builder cubre todav®™a, se puede pasar el contenido del mensaje ya armado como protobuf, agregando `raw: true`. ASTA-BOTS no lo interpreta ni lo transforma °™ lo manda tal cual:
 
 ```ts
 await sock.sendMessage(jid, {
@@ -419,7 +419,7 @@ await sock.sendMessage(jid, {
 })
 ```
 
-Es una salida de emergencia para power users; para el 99% de los casos alcanza con los m√©todos normales de `sendMessage`.
+Es una salida de emergencia para power users; para el 99% de los casos alcanza con los m®¶todos normales de `sendMessage`.
 
 ### Editar, eliminar, reenviar y fijar
 
@@ -433,60 +433,60 @@ await sock.sendMessage(jid, { delete: mensaje.key })
 // Reenviar un mensaje
 await sock.sendMessage(jid, { forward: mensajeOriginal })
 
-// Fijar un mensaje en el chat (24h, 7 d√≠as o 30 d√≠as)
+// Fijar un mensaje en el chat (24h, 7 d®™as o 30 d®™as)
 await sock.sendMessage(jid, { pin: mensaje.key, type: 1, time: 86400 })
 ```
 
 ### Mensajes enriquecidos
 
-Estos m√©todos permiten enviar contenido "enriquecido" reutilizando el mismo formato interno que WhatsApp usa para las respuestas de Meta AI (tablas, c√≥digo con resaltado de sintaxis, LaTeX, etc.), sin tener que armar el protobuf a mano.
+Estos m®¶todos permiten enviar contenido "enriquecido" reutilizando el mismo formato interno que WhatsApp usa para las respuestas de Meta AI (tablas, c®Ædigo con resaltado de sintaxis, LaTeX, etc.), sin tener que armar el protobuf a mano.
 
-**`sendTable`** ‚Äî env√≠a una tabla con encabezados y filas:
+**`sendTable`** °™ env®™a una tabla con encabezados y filas:
 
 ```ts
 await sock.sendTable(
   jid,
   'Precios',
   ['Producto', 'Precio'],
-  [['Caf√©', '$50'], ['T√©', '$40']],
+  [['Caf®¶', '$50'], ['T®¶', '$40']],
   undefined,
   { footer: 'Precios sujetos a cambio' }
 )
 ```
 
-**`sendList`** ‚Äî env√≠a una lista simple de elementos:
+**`sendList`** °™ env®™a una lista simple de elementos:
 
 ```ts
 await sock.sendList(jid, 'Tareas pendientes', ['Comprar pan', 'Enviar reporte', 'Llamar al cliente'])
 ```
 
-> No confundir con la lista de selecci√≥n de WhatsApp (`sections`) explicada en [Botones, listas, templates y carousel](#botones-listas-templates-y-carousel) ‚Äî `sendList` arma un mensaje enriquecido de solo lectura, no una lista interactiva con opciones seleccionables.
+> No confundir con la lista de selecci®Æn de WhatsApp (`sections`) explicada en [Botones, listas, templates y carousel](#botones-listas-templates-y-carousel) °™ `sendList` arma un mensaje enriquecido de solo lectura, no una lista interactiva con opciones seleccionables.
 
-**`sendCodeBlock`** ‚Äî env√≠a c√≥digo con resaltado de sintaxis (soporta `javascript`, `typescript`, `python`, entre otros):
+**`sendCodeBlock`** °™ env®™a c®Ædigo con resaltado de sintaxis (soporta `javascript`, `typescript`, `python`, entre otros):
 
 ```ts
 await sock.sendCodeBlock(jid, 'console.log("Hola mundo")', undefined, { language: 'javascript', title: 'Ejemplo' })
 ```
 
-**`sendLatex`** ‚Äî env√≠a una o m√°s expresiones matem√°ticas en formato LaTeX:
+**`sendLatex`** °™ env®™a una o m®¢s expresiones matem®¢ticas en formato LaTeX:
 
 ```ts
 await sock.sendLatex(jid, undefined, {
-  text: 'La f√≥rmula cuadr√°tica es:',
+  text: 'La f®Ærmula cuadr®¢tica es:',
   expressions: [{ latexExpression: 'x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}' }]
 })
 ```
 
-**`sendRichMessage`** ‚Äî env√≠a una combinaci√≥n libre de sub-mensajes (texto, tabla, c√≥digo, LaTeX, im√°genes) en un solo mensaje:
+**`sendRichMessage`** °™ env®™a una combinaci®Æn libre de sub-mensajes (texto, tabla, c®Ædigo, LaTeX, im®¢genes) en un solo mensaje:
 
 ```ts
 await sock.sendRichMessage(jid, [
-  { messageType: RichSubMessageType.TEXT, messageText: 'Resultado del an√°lisis:' },
+  { messageType: RichSubMessageType.TEXT, messageText: 'Resultado del an®¢lisis:' },
   { messageType: RichSubMessageType.TABLE, tableMetadata: { title: 'Datos', rows: [...] } }
 ])
 ```
 
-**`captureUnifiedResponse`** / **`sendUnifiedResponse`** ‚Äî permiten capturar la respuesta enriquecida de un mensaje recibido y reenviarla o reutilizarla tal cual:
+**`captureUnifiedResponse`** / **`sendUnifiedResponse`** °™ permiten capturar la respuesta enriquecida de un mensaje recibido y reenviarla o reutilizarla tal cual:
 
 ```ts
 const capturado = sock.captureUnifiedResponse(mensajeRecibido.message)
@@ -495,7 +495,7 @@ if (capturado) {
 }
 ```
 
-**`updateMediaMessage`** ‚Äî re-sube un archivo multimedia cuyo enlace venci√≥, para poder reenviarlo:
+**`updateMediaMessage`** °™ re-sube un archivo multimedia cuyo enlace venci®Æ, para poder reenviarlo:
 
 ```ts
 await sock.updateMediaMessage(mensajeConMediaVencido)
@@ -506,38 +506,38 @@ await sock.updateMediaMessage(mensajeConMediaVencido)
 Cualquier mensaje regular (texto, imagen, video, etc.) puede llevar la etiqueta/icono de "generado por IA" que WhatsApp muestra junto al mensaje, agregando la propiedad `ai: true` al contenido:
 
 ```ts
-await sock.sendMessage(jid, { text: 'Esta respuesta la gener√≥ un modelo de IA', ai: true })
+await sock.sendMessage(jid, { text: 'Esta respuesta la gener®Æ un modelo de IA', ai: true })
 ```
 
-> ‚ö†Ô∏è Esta marca **solo funciona en chats individuales** (no en grupos). Si se intenta usar `ai: true` en un grupo, ASTA-BOTS lanza un error indicando que el icono de IA solo est√° permitido en chats privados.
+> ?? Esta marca **solo funciona en chats individuales** (no en grupos). Si se intenta usar `ai: true` en un grupo, ASTA-BOTS lanza un error indicando que el icono de IA solo est®¢ permitido en chats privados.
 
 ### Estados (historias)
 
-`sendStatusWhatsApp` publica un estado (historia) en tu cuenta. A diferencia de `sendMessage`, este m√©todo est√° pensado para trabajar junto con **menciones**: el segundo par√°metro es un arreglo de JIDs (contactos o grupos) a los que se les notifica que fueron mencionados en el estado.
+`sendStatusWhatsApp` publica un estado (historia) en tu cuenta. A diferencia de `sendMessage`, este m®¶todo est®¢ pensado para trabajar junto con **menciones**: el segundo par®¢metro es un arreglo de JIDs (contactos o grupos) a los que se les notifica que fueron mencionados en el estado.
 
 ```ts
 await sock.sendStatusWhatsApp(
-  { text: 'Nuevo estado üöÄ', backgroundColor: '#25D366' },
-  [contactoJid, grupoJid] // se les notifica el estado como menci√≥n
+  { text: 'Nuevo estado ?', backgroundColor: '#25D366' },
+  [contactoJid, grupoJid] // se les notifica el estado como menci®Æn
 )
 ```
 
-- Si se pasa un JID de **contacto individual**, recibe la notificaci√≥n de menci√≥n de estado como corresponde a un chat privado.
-- Si se pasa un JID de **grupo**, el grupo entero recibe una √∫nica notificaci√≥n de menci√≥n de estado a nivel de grupo (no se le manda una notificaci√≥n repetida a cada miembro por separado).
-- Si no se pasa ning√∫n JID, el estado no se publica ya que requiere pasar las menciones necesarias.
-- Para contenido multimedia (imagen, video, audio) en el estado, se pueden combinar los mismos campos que en `sendMessage` (`image`, `video`, `audio`), y ASTA-BOTS ajusta autom√°ticamente el color de fondo y la fuente cuando corresponde.
+- Si se pasa un JID de **contacto individual**, recibe la notificaci®Æn de menci®Æn de estado como corresponde a un chat privado.
+- Si se pasa un JID de **grupo**, el grupo entero recibe una ®≤nica notificaci®Æn de menci®Æn de estado a nivel de grupo (no se le manda una notificaci®Æn repetida a cada miembro por separado).
+- Si no se pasa ning®≤n JID, el estado no se publica ya que requiere pasar las menciones necesarias.
+- Para contenido multimedia (imagen, video, audio) en el estado, se pueden combinar los mismos campos que en `sendMessage` (`image`, `video`, `audio`), y ASTA-BOTS ajusta autom®¢ticamente el color de fondo y la fuente cuando corresponde.
 
 ### Recibos, lectura y presencia
 
 
 ```ts
-// Marcar mensajes como le√≠dos (doble check azul)
+// Marcar mensajes como le®™dos (doble check azul)
 await sock.readMessages([mensaje.key])
 
 // Enviar un recibo manualmente
 await sock.sendReceipt(jid, participante, [id], 'read')
 
-// Actualizar presencia (escribiendo, grabando audio, en l√≠nea)
+// Actualizar presencia (escribiendo, grabando audio, en l®™nea)
 await sock.sendPresenceUpdate('composing', jid) // 'available' | 'unavailable' | 'composing' | 'recording' | 'paused'
 
 // Suscribirse a la presencia de un contacto
@@ -546,16 +546,16 @@ await sock.presenceSubscribe(jid)
 
 ## Grupos, comunidades y canales
 
-ASTA-BOTS conserva toda la funcionalidad est√°ndar de Baileys para administrar grupos, comunidades (grupos con subgrupos) y canales de difusi√≥n (newsletters):
+ASTA-BOTS conserva toda la funcionalidad est®¢ndar de Baileys para administrar grupos, comunidades (grupos con subgrupos) y canales de difusi®Æn (newsletters):
 
 ```ts
 await sock.groupCreate('Mi grupo', [jid1, jid2])
 await sock.groupParticipantsUpdate(jid, [participante], 'add') // 'add' | 'remove' | 'promote' | 'demote'
 await sock.groupInviteCode(jid)
 
-await sock.communityCreate('Mi comunidad', 'Descripci√≥n')
+await sock.communityCreate('Mi comunidad', 'Descripci®Æn')
 
-await sock.newsletterCreate('Mi canal', 'Descripci√≥n del canal')
+await sock.newsletterCreate('Mi canal', 'Descripci®Æn del canal')
 ```
 
 ## Perfil, privacidad y negocios
@@ -567,22 +567,22 @@ await sock.updateProfilePicture(jid, { url: './avatar.jpg' })
 
 await sock.updateBlockStatus(jid, 'block') // o 'unblock'
 
-// API de negocios (cat√°logo, pedidos)
+// API de negocios (cat®¢logo, pedidos)
 await sock.getCatalog({ jid })
 await sock.productCreate({ ... })
 ```
 
-## Store (cach√© en memoria)
+## Store (cach®¶ en memoria)
 
-El **Store** es un cach√© en memoria de chats, contactos, mensajes y metadata de grupos, que se va llenando solo a medida que van llegando eventos (`sock.ev`). El Baileys oficial m√°s reciente **elimin√≥ este m√≥dulo** de la librer√≠a; en ASTA-BOTS se mantiene disponible porque resuelve un problema muy com√∫n al hacer un bot: no depender de volver a pedirle todo a WhatsApp (mensaje anterior, foto de perfil, metadata de un grupo) cada vez que se necesita.
+El **Store** es un cach®¶ en memoria de chats, contactos, mensajes y metadata de grupos, que se va llenando solo a medida que van llegando eventos (`sock.ev`). El Baileys oficial m®¢s reciente **elimin®Æ este m®Ædulo** de la librer®™a; en ASTA-BOTS se mantiene disponible porque resuelve un problema muy com®≤n al hacer un bot: no depender de volver a pedirle todo a WhatsApp (mensaje anterior, foto de perfil, metadata de un grupo) cada vez que se necesita.
 
-### ¬øCu√°ndo conviene usarlo?
+### ?Cu®¢ndo conviene usarlo?
 
-- Si tu bot necesita **buscar mensajes anteriores** (por ejemplo, para citar o reenviar algo que no ten√©s a mano).
-- Si quer√©s **listar los chats o contactos** sin tener que reconstruirlos manualmente desde los eventos.
-- Si hac√©s muchas consultas de `groupMetadata` o `profilePictureUrl` y no quer√©s golpear la API de WhatsApp cada vez.
+- Si tu bot necesita **buscar mensajes anteriores** (por ejemplo, para citar o reenviar algo que no ten®¶s a mano).
+- Si quer®¶s **listar los chats o contactos** sin tener que reconstruirlos manualmente desde los eventos.
+- Si hac®¶s muchas consultas de `groupMetadata` o `profilePictureUrl` y no quer®¶s golpear la API de WhatsApp cada vez.
 
-Si tu bot es simple y solo responde a mensajes entrantes sin necesitar historial, pod√©s omitirlo sin problema; el store consume RAM porque guarda todo en memoria.
+Si tu bot es simple y solo responde a mensajes entrantes sin necesitar historial, pod®¶s omitirlo sin problema; el store consume RAM porque guarda todo en memoria.
 
 ### Uso
 
@@ -612,83 +612,83 @@ const mensaje = await store.loadMessage(jid, mensajeId)
 
 ## Utilidades ASTA-BOTS
 
-Estas utilidades son propias de **ASTA-BOTS** y no existen en el Baileys original: nacieron para resolver lo m√°s repetitivo al armar un bot de comandos.
+Estas utilidades son propias de **ASTA-BOTS** y no existen en el Baileys original: nacieron para resolver lo m®¢s repetitivo al armar un bot de comandos.
 
-### `resolveJid`: resoluci√≥n autom√°tica de JID
+### `resolveJid`: resoluci®Æn autom®¢tica de JID
 
-Detecta el JID objetivo de un comando sin que tengas que pasarlo a mano, siguiendo esta prioridad: **mensaje citado ‚Üí primera menci√≥n ‚Üí argumento num√©rico ‚Üí remitente**.
+Detecta el JID objetivo de un comando sin que tengas que pasarlo a mano, siguiendo esta prioridad: **mensaje citado °˙ primera menci®Æn °˙ argumento num®¶rico °˙ remitente**.
 
 ```ts
 import { resolveJid } from 'baileys'
 
-// .ban (respondiendo a alguien) ‚Üí toma el citado
-// .ban @usuario                  ‚Üí toma la menci√≥n
-// .ban 5216141234567             ‚Üí toma el argumento
-// .ban                           ‚Üí cae al remitente
+// .ban (respondiendo a alguien) °˙ toma el citado
+// .ban @usuario                  °˙ toma la menci®Æn
+// .ban 5216141234567             °˙ toma el argumento
+// .ban                           °˙ cae al remitente
 const targetJid = resolveJid(m, args[0])
 ```
 
 ### Sistema de botones de conveniencia
 
-Adem√°s del soporte nativo de `sock.sendMessage` (ver [Botones, listas, templates y carousel](#botones-listas-templates-y-carousel)), ASTA-BOTS trae funciones listas para usar cuando quer√©s algo r√°pido sin armar el objeto del mensaje:
+Adem®¢s del soporte nativo de `sock.sendMessage` (ver [Botones, listas, templates y carousel](#botones-listas-templates-y-carousel)), ASTA-BOTS trae funciones listas para usar cuando quer®¶s algo r®¢pido sin armar el objeto del mensaje:
 
 ```ts
 import { sendQuickReplyButtons, setupButtonHandler } from 'baileys'
 
-// Engancha el detector de respuestas de bot√≥n una sola vez, al iniciar
+// Engancha el detector de respuestas de bot®Æn una sola vez, al iniciar
 setupButtonHandler(sock, plugins, db)
 
-await sendQuickReplyButtons(sock, jid, '¬øQu√© quer√©s hacer?', [
-  { text: 'üìã Men√∫', id: 'menu' },
-  { text: '‚öôÔ∏è Ajustes', id: 'settings' }
+await sendQuickReplyButtons(sock, jid, '?Qu®¶ quer®¶s hacer?', [
+  { text: '? Men®≤', id: 'menu' },
+  { text: '?? Ajustes', id: 'settings' }
 ])
 ```
 
-| Funci√≥n | Qu√© hace |
+| Funci®Æn | Qu®¶ hace |
 |---|---|
-| `sendCopyButton` | Bot√≥n que copia texto al portapapeles |
-| `sendUrlButton` | Bot√≥n de enlace |
-| `sendQuickReplyButtons` | Botones de respuesta r√°pida |
-| `sendCallButton` | Bot√≥n de llamada |
+| `sendCopyButton` | Bot®Æn que copia texto al portapapeles |
+| `sendUrlButton` | Bot®Æn de enlace |
+| `sendQuickReplyButtons` | Botones de respuesta r®¢pida |
+| `sendCallButton` | Bot®Æn de llamada |
 | `sendListMenu` | Lista desplegable con secciones |
-| `sendInteractiveMessage` | Combinaci√≥n de varios tipos de bot√≥n |
-| `handleButtonResponse` | Detecta y ejecuta el comando de un bot√≥n presionado |
+| `sendInteractiveMessage` | Combinaci®Æn de varios tipos de bot®Æn |
+| `handleButtonResponse` | Detecta y ejecuta el comando de un bot®Æn presionado |
 | `setupButtonHandler` | Engancha el detector de botones al socket sin pisar tu handler de mensajes |
 
-Todas caen a texto plano autom√°ticamente si WhatsApp rechaza el mensaje interactivo.
+Todas caen a texto plano autom®¢ticamente si WhatsApp rechaza el mensaje interactivo.
 
-### C√≥digo de vinculaci√≥n de marca
+### C®Ædigo de vinculaci®Æn de marca
 
-Al pedir un c√≥digo de emparejamiento sin especificar uno propio, ASTA-BOTS usa por defecto el c√≥digo de marca **`ASTABOTS`** (8 caracteres, cumple el requisito de WhatsApp):
+Al pedir un c®Ædigo de emparejamiento sin especificar uno propio, ASTA-BOTS usa por defecto el c®Ædigo de marca **`ASTABOTS`** (8 caracteres, cumple el requisito de WhatsApp):
 
 ```ts
 const code = await sock.requestPairingCode('5216141234567')
 // code === 'ASTABOTS'
 
-// o con tu propio c√≥digo de 8 caracteres:
+// o con tu propio c®Ædigo de 8 caracteres:
 const code2 = await sock.requestPairingCode('5216141234567', 'MIPROPIO')
 ```
 
 ## Aviso legal
 
-Este proyecto no est√° afiliado, asociado, autorizado ni respaldado de ninguna forma por WhatsApp Inc. ni por Meta. "WhatsApp" y las marcas relacionadas son propiedad de sus respectivos due√±os.
+Este proyecto no est®¢ afiliado, asociado, autorizado ni respaldado de ninguna forma por WhatsApp Inc. ni por Meta. "WhatsApp" y las marcas relacionadas son propiedad de sus respectivos due?os.
 
-El uso de esta librer√≠a es responsabilidad exclusiva de quien la implementa. Se recomienda no usarla para spam, mensajer√≠a masiva no solicitada ni cualquier pr√°ctica que viole los T√©rminos de Servicio de WhatsApp.
+El uso de esta librer®™a es responsabilidad exclusiva de quien la implementa. Se recomienda no usarla para spam, mensajer®™a masiva no solicitada ni cualquier pr®¢ctica que viole los T®¶rminos de Servicio de WhatsApp.
 
-## Cr√©ditos
+## Cr®¶ditos
 
-**ASTA-BOTS** es un fork de **[Baileys](https://github.com/WhiskeySockets/Baileys)**, la librer√≠a original mantenida por la comunidad de **WhiskeySockets**. Gran parte de la base de este proyecto ‚Äîel manejo del protocolo de WhatsApp Web, el cifrado, la arquitectura del socket y la mayor√≠a del c√≥digo‚Äî proviene de ese trabajo original.
+**ASTA-BOTS** es un fork de **[Baileys](https://github.com/WhiskeySockets/Baileys)**, la librer®™a original mantenida por la comunidad de **WhiskeySockets**. Gran parte de la base de este proyecto °™el manejo del protocolo de WhatsApp Web, el cifrado, la arquitectura del socket y la mayor®™a del c®Ædigo°™ proviene de ese trabajo original.
 
 - Repositorio oficial: https://github.com/WhiskeySockets/Baileys
 - Licencia: MIT
 
-Si esta librer√≠a te resulta √∫til, consider√° tambi√©n dar reconocimiento y apoyo al proyecto original que es de this-xys/bails. üôå
+Si esta librer®™a te resulta ®≤til, consider®¢ tambi®¶n dar reconocimiento y apoyo al proyecto original que es de this-xys/bails. ?
 
 ---
 
-<div align="center">Hecho con üíô por <b>ASTA-BOTS</b></div>
+<div align="center">Hecho con ? por <b>ASTA-BOTS</b></div>
 
-## cr√©ditos
+## cr®¶ditos
 
 this-xys/bails
 
