@@ -1,54 +1,46 @@
-import { Boom } from '@hapi/boom'
+import { Boom } from '@neykoor/boom'
 import type { Contact } from './Contact'
 
 export enum SyncState {
-	/** The socket is connecting, but we haven't received pending notifications yet. */
+	
 	Connecting,
-	/** Pending notifications received. Buffering events until we decide whether to sync or not. */
+	
 	AwaitingInitialSync,
-	/** The initial app state sync (history, etc.) is in progress. Buffering continues. */
+	
 	Syncing,
-	/** Initial sync is complete, or was skipped. The socket is fully operational and events are processed in real-time. */
+	
 	Online
 }
 
 export type WAConnectionState = 'open' | 'connecting' | 'close'
 
 export type ConnectionState = {
-	/** connection is now open, connecting or closed */
+	
 	connection: WAConnectionState
 
-	/** the error that caused the connection to close */
+	
 	lastDisconnect?: {
-		// TODO: refactor and gain independence from Boom
+
 		error: Boom | Error | undefined
 		date: Date
 	}
-	/** is this a new login */
+	
 	isNewLogin?: boolean
-	/** the current QR code */
+	
 	qr?: string
-	/**
-	 * the server is forcing a passkey ("Shortcake") to link this device. `hasSigner` is `true` when a
-	 * `signPasskeyAssertion` is configured (handshake proceeds), `false` when the link can't complete headless.
-	 */
 	passkeyRequired?: { hasSigner: boolean }
-	/** has the device received all pending notifications while it was offline */
+	
 	receivedPendingNotifications?: boolean
-	/** legacy connection options */
+	
 	legacy?: {
 		phoneConnected: boolean
 		user?: Contact
 	}
-	/**
-	 * if the client is shown as an active, online client.
-	 * If this is false, the primary phone and other devices will receive notifs
-	 * */
+	
+	 
 	isOnline?: boolean
 
-	/**
-	 * When you are in this state, WhatsApp prevents outgoing messages and calls.
-	 */
+	
 	reachoutTimeLock?: ReachoutTimelockState
 }
 
@@ -75,7 +67,6 @@ export enum ReachoutTimelockEnforcementType {
 	BIZ_COMMERCE_VIOLATION_VIOLENT_CONTENT = 'BIZ_COMMERCE_VIOLATION_VIOLENT_CONTENT',
 	BIZ_COMMERCE_VIOLATION_WEAPONS = 'BIZ_COMMERCE_VIOLATION_WEAPONS',
 	BIZ_QUALITY = 'BIZ_QUALITY',
-	/** This means there is no restriction */
 	DEFAULT = 'DEFAULT',
 	WEB_COMPANION_ONLY = 'WEB_COMPANION_ONLY'
 }
