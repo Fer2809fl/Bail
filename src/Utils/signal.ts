@@ -101,7 +101,7 @@ export const extractE2ESessionFromRetryReceipt = (receipt: BinaryNode) => {
 	if (!identity || identity.length !== 32 || !skey) return null
 
 	const registrationId = getBinaryNodeChildUInt(receipt, 'registration', 4)
-	if (!isValidUInt(registrationId)) return null
+	if (!isValidUInt(registrationId) || registrationId === 0) return null
 
 	const signedPubKey = getBinaryNodeChildBuffer(skey, 'value')
 	const signedSig = getBinaryNodeChildBuffer(skey, 'signature')
@@ -148,11 +148,6 @@ export const parseAndInjectE2ESessions = async (node: BinaryNode, repository: Si
 		assertNodeErrorFree(node)
 	}
 
-	// Most of the work in repository.injectE2ESession is CPU intensive, not IO
-	// So Promise.all doesn't really help here,
-	// but blocks even loop if we're using it inside keys.transaction, and it makes it "sync" actually
-	// This way we chunk it in smaller parts and between those parts we can yield to the event loop
-	// It's rare case when you need to E2E sessions for so many users, but it's possible
 	const chunkSize = 100
 	const chunks = chunk(nodes, chunkSize)
 
@@ -164,11 +159,14 @@ export const parseAndInjectE2ESessions = async (node: BinaryNode, repository: Si
 			const jid = node.attrs.jid!
 
 			const registrationId = getBinaryNodeChildUInt(node, 'registration', 4)
+			if (!isValidUInt(registrationId) || registrationId === 0) {
+				continue
+			}
 
 			await repository.injectE2ESession({
 				jid,
 				session: {
-					registrationId: registrationId!,
+					registrationId,
 					identityKey: generateSignalPubKey(identity),
 					signedPreKey: extractKey(signedKey)!,
 					preKey: extractKey(key)!
@@ -197,9 +195,9 @@ export const extractDeviceJids = (
 		if (!Array.isArray(deviceList)) continue
 		for (const { id: device, keyIndex, isHosted } of deviceList) {
 			if (
-				(!excludeZeroDevices || device !== 0) && // if zero devices are not-excluded, or device is non zero
-				((myUser !== user && myLid !== user) || myDevice !== device) && // either different user or if me user, not this device
-				(device === 0 || !!keyIndex) // ensure that "key-index" is specified for "non-zero" devices, produces a bad req otherwise
+				(!excludeZeroDevices || device !== 0) &&
+				((myUser !== user && myLid !== user) || myDevice !== device) &&
+				(device === 0 || !!keyIndex)
 			) {
 				if (isHosted) {
 					domainType = domainType === WAJIDDomains.LID ? WAJIDDomains.HOSTED_LID : WAJIDDomains.HOSTED
@@ -218,10 +216,6 @@ export const extractDeviceJids = (
 	return extracted
 }
 
-/**
- * get the next N keys for upload or processing
- * @param count number of pre-keys to get or generate
- */
 export const getNextPreKeys = async ({ creds, keys }: AuthenticationState, count: number) => {
 	const { newPreKeys, lastPreKeyId, preKeysRange } = generateOrGetPreKeys(creds, count)
 
@@ -258,4 +252,5 @@ export const getNextPreKeysNode = async (state: AuthenticationState, count: numb
 	}
 
 	return { update, node }
-}
+		}
+		
