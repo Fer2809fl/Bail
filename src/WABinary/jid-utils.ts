@@ -1,3 +1,5 @@
+import { LRUCache } from 'lru-cache'
+
 export const S_WHATSAPP_NET = '@s.whatsapp.net'
 export const OFFICIAL_BIZ_JID = '16505361212@c.us'
 export const SERVER_JID = 'server@c.us'
@@ -127,40 +129,50 @@ export const transferDevice = (fromJid: string, toJid: string) => {
 	return jidEncode(user, server, deviceId)
 }
 
-/**
- * Resuelve el JID objetivo de un comando siguiendo esta prioridad:
- * 1. Mensaje citado (quoted)
- * 2. Primera mención (@usuario)
- * 3. Argumento numérico pasado como texto
- * 4. Remitente del mensaje (fallback)
- *
- * Esto permite detectar y normalizar el JID sin tener que pasar
- * manualmente el número del bot/usuario en cada comando.
- */
-export const resolveJid = (m: any, arg = ''): string => {
-	// 1. Mensaje citado
-	const quoted = m?.quoted?.sender || m?.quoted?.key?.participant || m?.quoted?.participant
-	if (quoted) {
-		return jidNormalizedUser(quoted)
-	}
+const LID_PHONE_CACHE_MAX_SIZE = 3000
+const LID_PHONE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
-	// 2. Primera mención
-	const menciones: string[] =
-		m?.message?.extendedTextMessage?.contextInfo?.mentionedJid ||
-		m?.message?.imageMessage?.contextInfo?.mentionedJid ||
-		[]
-	if (menciones.length > 0) {
-		return jidNormalizedUser(menciones[0])
-	}
+export type LidPhoneCache = {
+	set(lid: string | undefined, phoneJid: string | undefined): void
+	get(key: string | undefined): string | undefined
+	getLidForPhone(phoneJid: string | undefined): string | undefined
+	getPhoneForLid(lid: string | undefined): string | undefined
+	readonly size: number
+}
 
-	// 3. Argumento numérico
-	if (arg) {
-		const num = String(arg).replace(/[^0-9]/g, '')
-		if (num.length >= 7) {
-			return `${num}@s.whatsapp.net`
+/** bidirectional LID<->PN in-memory cache, opportunistically populated while parsing binary nodes */
+export function createLidPhoneCache(): LidPhoneCache {
+	const cache = new LRUCache<string, string>({
+		max: LID_PHONE_CACHE_MAX_SIZE * 2,
+		ttl: LID_PHONE_CACHE_TTL_MS,
+		ttlAutopurge: true,
+		updateAgeOnGet: true
+	})
+
+	return {
+		set(lid, phoneJid) {
+			if (!lid || !phoneJid || typeof lid !== 'string' || typeof phoneJid !== 'string') return
+			if (!phoneJid.includes('@')) phoneJid = phoneJid + S_WHATSAPP_NET
+
+			cache.set(lid, phoneJid)
+			cache.set(phoneJid, lid)
+		},
+		get(key) {
+			if (!key) return undefined
+			return cache.get(key)
+		},
+		getLidForPhone(phoneJid) {
+			if (!phoneJid) return undefined
+			const val = cache.get(phoneJid)
+			return val && (isLidUser(val) || isHostedLidUser(val)) ? val : undefined
+		},
+		getPhoneForLid(lid) {
+			if (!lid) return undefined
+			const val = cache.get(lid)
+			return val && (isPnUser(val) || isHostedPnUser(val)) ? val : undefined
+		},
+		get size() {
+			return cache.size
 		}
 	}
-
-	// 4. Fallback al remitente
-	return jidNormalizedUser(m?.sender)
 }
