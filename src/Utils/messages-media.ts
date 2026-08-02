@@ -1,4 +1,4 @@
-import { Boom } from '@hapi/boom'
+import { Boom } from '@neykoor/boom'
 import { spawn } from 'child_process'
 import * as Crypto from 'crypto'
 import { once } from 'events'
@@ -10,7 +10,7 @@ import { join } from 'path'
 import { Readable, Transform } from 'stream'
 import { URL } from 'url'
 import { proto } from '../../WAProto/index.js'
-import { DEFAULT_ORIGIN, MEDIA_HKDF_KEY_MAPPING, MEDIA_PATH_MAP, type MediaType } from '../Defaults'
+import { DEFAULT_ORIGIN, MEDIA_HKDF_KEY_MAPPING, MEDIA_PATH_MAP, NEWSLETTER_MEDIA_PATH_MAP, type MediaType } from '../Defaults'
 import type {
 	BaileysEventMap,
 	DownloadableMessage,
@@ -32,6 +32,115 @@ import type { ILogger } from './logger'
 const getTmpFilesDirectory = () => tmpdir()
 
 let imageProcessingLibrary: { sharp?: any; napi?: any; jimp?: any } | undefined
+
+let ffmpegAvailable: boolean | undefined
+async function assertFfmpegAvailable(): Promise<void> {
+	if (ffmpegAvailable !== undefined) {
+		if (!ffmpegAvailable) {
+			throw new Boom(
+				'ffmpeg is not installed or not on PATH. transcodeAudioToOpus() requires the `ffmpeg` binary to convert audio to PTT-compatible opus.',
+				{ statusCode: 0 }
+			)
+		}
+
+		return
+	}
+
+	ffmpegAvailable = await new Promise<boolean>(resolve => {
+		const check = spawn('ffmpeg', ['-version'])
+		check.on('error', () => resolve(false))
+		check.on('close', code => resolve(code === 0))
+	})
+
+	if (!ffmpegAvailable) {
+		throw new Boom(
+			'ffmpeg is not installed or not on PATH. transcodeAudioToOpus() requires the `ffmpeg` binary to convert audio to PTT-compatible opus.',
+			{ statusCode: 0 }
+		)
+	}
+}
+
+const MAX_CONCURRENT_TRANSCODES = 2
+let activeTranscodes = 0
+const transcodeQueue: Array<() => void> = []
+
+async function acquireTranscodeSlot(): Promise<void> {
+	if (activeTranscodes < MAX_CONCURRENT_TRANSCODES) {
+		activeTranscodes++
+		return
+	}
+
+	await new Promise<void>(resolve => transcodeQueue.push(resolve))
+	activeTranscodes++
+}
+
+function releaseTranscodeSlot(): void {
+	activeTranscodes--
+	const next = transcodeQueue.shift()
+	if (next) next()
+}
+
+export async function transcodeAudioToOpus(input: string | Buffer): Promise<string> {
+	await assertFfmpegAvailable()
+	await acquireTranscodeSlot()
+
+	const outputPath = join(tmpdir(), 'ptt-' + generateMessageIDV2() + '.ogg')
+	let inputPath = input
+	let tempInputPath: string | undefined
+
+	try {
+		if (Buffer.isBuffer(input)) {
+			tempInputPath = join(tmpdir(), 'ptt-src-' + generateMessageIDV2())
+			await fs.writeFile(tempInputPath, input)
+			inputPath = tempInputPath
+		}
+
+		await new Promise<void>((resolve, reject) => {
+			const args = [
+				'-i',
+				inputPath as string,
+				'-y',
+				'-vn',
+				'-ac',
+				'1',
+				'-ar',
+				'16000',
+				'-c:a',
+				'libopus',
+				'-b:a',
+				'32k',
+				'-f',
+				'ogg',
+				outputPath
+			]
+			const child = spawn('ffmpeg', args)
+
+			let stderr = ''
+			child.stderr?.on('data', chunk => {
+				stderr += chunk
+			})
+
+			child.on('error', reject)
+			child.on('close', code => {
+				if (code === 0) {
+					resolve()
+				} else {
+					reject(new Boom(`ffmpeg exited with code ${code}`, { data: stderr }))
+				}
+			})
+		})
+
+		return outputPath
+	} catch (err) {
+		await fs.unlink(outputPath).catch(() => {})
+		throw err
+	} finally {
+		releaseTranscodeSlot()
+		if (tempInputPath) {
+			await fs.unlink(tempInputPath).catch(() => {})
+		}
+	}
+}
 
 export const getImageProcessingLibrary = async () => {
 	if (imageProcessingLibrary) {
@@ -752,6 +861,7 @@ type MediaUploadResult = {
 	meta_hmac?: string
 	ts?: number
 	fbid?: number
+	thumbnail_info?: { thumbnail_direct_path?: string; thumbnail_sha256?: string }
 }
 
 export type UploadParams = {
@@ -898,11 +1008,21 @@ export const getWAUploadToServer = (
 	{ customUploadHosts, fetchAgent, logger, options }: SocketConfig,
 	refreshMediaConn: (force: boolean) => Promise<MediaConnInfo>
 ): WAMediaUploadFunction => {
-	return async (filePath, { mediaType, fileEncSha256B64, timeoutMs }) => {
+	return async (filePath, { mediaType, fileEncSha256B64, timeoutMs, newsletter }) => {
 		// send a query JSON to obtain the url & auth token to upload our media
 		let uploadInfo = await refreshMediaConn(false)
 
-		let urls: { mediaUrl: string; directPath: string; meta_hmac?: string; ts?: number; fbid?: number } | undefined
+		let urls:
+			| {
+					mediaUrl: string
+					directPath: string
+					meta_hmac?: string
+					ts?: number
+					fbid?: number
+					thumbnailDirectPath?: string
+					thumbnailSha256?: string
+			  }
+			| undefined
 		const hosts = [...customUploadHosts, ...uploadInfo.hosts]
 
 		fileEncSha256B64 = encodeBase64EncodedStringForUpload(fileEncSha256B64)
@@ -924,7 +1044,9 @@ export const getWAUploadToServer = (
 			logger.debug(`uploading to "${hostname}"`)
 
 			const auth = encodeURIComponent(uploadInfo.auth)
-			const url = `https://${hostname}${MEDIA_PATH_MAP[mediaType]}/${fileEncSha256B64}?auth=${auth}&token=${fileEncSha256B64}`
+			const mediaPathMap = newsletter ? NEWSLETTER_MEDIA_PATH_MAP : MEDIA_PATH_MAP
+			const serverThumb = newsletter ? '&server_thumb_gen=1' : ''
+			const url = `https://${hostname}${mediaPathMap[mediaType]}/${fileEncSha256B64}?auth=${auth}&token=${fileEncSha256B64}${serverThumb}`
 
 			let result: MediaUploadResult | undefined
 			try {
@@ -945,7 +1067,9 @@ export const getWAUploadToServer = (
 						directPath: result.direct_path!,
 						meta_hmac: result.meta_hmac,
 						fbid: result.fbid,
-						ts: result.ts
+						ts: result.ts,
+						thumbnailDirectPath: result.thumbnail_info?.thumbnail_direct_path,
+						thumbnailSha256: result.thumbnail_info?.thumbnail_sha256
 					}
 					break
 				} else {
