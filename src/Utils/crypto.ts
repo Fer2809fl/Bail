@@ -1,5 +1,5 @@
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from 'crypto'
-import * as curve from 'libsignal/src/curve'
+import * as curve from 'libsignal/lib/curve.js'
 import { KEY_BUNDLE_TYPE } from '../Defaults'
 import type { KeyPair } from '../Types'
 export { md5, hkdf } from 'whatsapp-rust-bridge'
@@ -41,7 +41,7 @@ export const signedKeyPair = (identityKeyPair: KeyPair, keyId: number) => {
 
 	const signature = Curve.sign(identityKeyPair.private, pubKey)
 
-	return { keyPair: preKey, signature, keyId }
+	return { keyPair: preKey, signature, keyId, timestampS: Math.floor(Date.now() / 1000) }
 }
 
 const GCM_TAG_LENGTH = 128 >> 3
