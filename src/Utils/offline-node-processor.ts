@@ -13,12 +13,6 @@ export type OfflineNodeProcessorDeps = {
 	yieldToEventLoop: () => Promise<void>
 }
 
-/**
- * Creates a processor for offline stanza nodes that:
- * - Queues nodes for sequential processing
- * - Yields to the event loop periodically to avoid blocking
- * - Catches handler errors to prevent the processing loop from crashing
- */
 export function makeOfflineNodeProcessor(
 	nodeProcessorMap: Map<MessageType, (node: BinaryNode) => Promise<void>>,
 	deps: OfflineNodeProcessorDeps,
@@ -27,10 +21,12 @@ export function makeOfflineNodeProcessor(
 	const nodes: OfflineNode[] = []
 	let isProcessing = false
 
-	const enqueue = (type: MessageType, node: BinaryNode) => {
-		nodes.push({ type, node })
-
+	const runLoop = () => {
 		if (isProcessing) {
+			return
+		}
+
+		if (!nodes.length || !deps.isWsOpen()) {
 			return
 		}
 
@@ -52,8 +48,6 @@ export function makeOfflineNodeProcessor(
 				await nodeProcessor(node).catch(err => deps.onUnexpectedError(err, `processing offline ${type}`))
 				processedInBatch++
 
-				// Yield to event loop after processing a batch
-				// This prevents blocking the event loop for too long when there are many offline nodes
 				if (processedInBatch >= batchSize) {
 					processedInBatch = 0
 					await deps.yieldToEventLoop()
@@ -61,10 +55,26 @@ export function makeOfflineNodeProcessor(
 			}
 
 			isProcessing = false
+
+			if (nodes.length && deps.isWsOpen()) {
+				runLoop()
+			}
 		}
 
-		promise().catch(error => deps.onUnexpectedError(error, 'processing offline nodes'))
+		promise().catch(error => {
+			isProcessing = false
+			deps.onUnexpectedError(error, 'processing offline nodes')
+		})
 	}
 
-	return { enqueue }
+	const enqueue = (type: MessageType, node: BinaryNode) => {
+		nodes.push({ type, node })
+		runLoop()
+	}
+
+	const resume = () => {
+		runLoop()
+	}
+
+	return { enqueue, resume }
 }
