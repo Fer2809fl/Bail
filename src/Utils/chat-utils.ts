@@ -1,4 +1,4 @@
-import { Boom } from '@hapi/boom'
+import { Boom } from '@neykoor/boom'
 import { expandAppStateKeys } from 'whatsapp-rust-bridge'
 import { proto } from '../../WAProto/index.js'
 import type {
