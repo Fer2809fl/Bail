@@ -1,8 +1,8 @@
-import { Boom } from '@hapi/boom'
+import { Boom } from '@neykoor/boom'
 import { createHash, randomBytes } from 'crypto'
 import type Long from 'long'
 import { proto } from '../../WAProto/index.js'
-const baileysVersion = [2, 3000, 1042637586]
+const baileysVersion = [2, 3000, 1044006379]
 import type {
 	BaileysEventEmitter,
 	BaileysEventMap,
@@ -357,10 +357,7 @@ const CODE_MAP: { [_: string]: DisconnectReason } = {
 	conflict: DisconnectReason.connectionReplaced
 }
 
-/**
- * Stream errors generally provide a reason, map that to a baileys DisconnectReason
- * @param reason the string reason given, eg. "conflict"
- */
+
 export const getErrorCodeFromStreamError = (node: BinaryNode) => {
 	const [reasonNode] = getAllBinaryNodeChildren(node)
 	let reason = reasonNode?.tag || 'unknown'
@@ -387,7 +384,7 @@ export const getCallStatusFromNode = ({ tag, attrs }: BinaryNode) => {
 			if (attrs.reason === 'timeout') {
 				status = 'timeout'
 			} else {
-				//fired when accepted/rejected/timeout/caller hangs up
+				 
 				status = 'terminate'
 			}
 
@@ -425,26 +422,21 @@ export const getCodeFromWSError = (error: Error) => {
 			statusCode = code
 		}
 	} else if (
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		(error as any)?.code?.startsWith('E') ||
 		error?.message?.includes('timed out')
 	) {
-		// handle ETIMEOUT, ENOTFOUND etc
+	
 		statusCode = 408
 	}
 
 	return statusCode
 }
 
-/**
- * Is the given platform WA business
- * @param platform AuthenticationCreds.platform
- */
+
 export const isWABusinessPlatform = (platform: string) => {
 	return platform === 'smbi' || platform === 'smba'
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function trimUndefined(obj: { [_: string]: any }) {
 	for (const key in obj) {
 		if (typeof obj[key] === 'undefined') {
@@ -481,4 +473,5 @@ export function bytesToCrockford(buffer: Buffer): string {
 
 export function encodeNewsletterMessage(message: proto.IMessage): Uint8Array {
 	return proto.Message.encode(message).finish()
-}
+				}
+		
