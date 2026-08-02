@@ -17,14 +17,14 @@ export type SqliteAuthStateOptions =
 
 async function loadBetterSqlite3(): Promise<typeof DatabaseCtor> {
 	try {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		
 		const mod: any = await import('better-sqlite3')
 		return mod.default ?? mod
 	} catch (err) {
 		const helpful = new Error(
 			'`better-sqlite3` is required for `useSqliteAuthState`. Install it as a peer dependency: `npm install better-sqlite3` (or `yarn add better-sqlite3`).'
 		)
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		
 		;(helpful as any).cause = err
 		throw helpful
 	}
@@ -48,7 +48,7 @@ CREATE INDEX IF NOT EXISTS signal_keys_type_idx ON signal_keys(type);
 
 export async function useSqliteAuthState(
 	opts: SqliteAuthStateOptions
-): Promise<{ state: AuthenticationState; saveCreds: () => void }> {
+): Promise<{ state: AuthenticationState; saveCreds: () => void; close: () => void }> {
 	let db: SqliteDatabase
 	if ('database' in opts) {
 		db = opts.database
@@ -57,11 +57,12 @@ export async function useSqliteAuthState(
 		db = new Database(opts.dbPath)
 	}
 
-	// WAL mode allows concurrent reads alongside a single writer; matches
-	// what SQLite recommends for read-heavy workloads with sporadic writes.
 	db.pragma('journal_mode = WAL')
 	db.pragma('synchronous = NORMAL')
+	db.pragma('busy_timeout = 5000')
 	db.exec(CREATE_SCHEMA_SQL)
+
+	let closed = false
 
 	const stmts = {
 		credsSelect: db.prepare<[string], { value: string }>('SELECT value FROM creds WHERE key = ?'),
@@ -88,6 +89,7 @@ export async function useSqliteAuthState(
 	}
 
 	const persistCreds = (creds: AuthenticationCreds) => {
+		if (closed || !db.open) return
 		stmts.credsUpsert.run(CREDS_ROW_KEY, JSON.stringify(creds, BufferJSON.replacer))
 	}
 
@@ -99,6 +101,7 @@ export async function useSqliteAuthState(
 			keys: {
 				get: async (type, ids) => {
 					const data: { [_: string]: SignalDataTypeMap[typeof type] } = {}
+					if (closed || !db.open) return data
 					for (const id of ids) {
 						const row = stmts.keySelect.get(type, id)
 						if (row) {
@@ -114,6 +117,7 @@ export async function useSqliteAuthState(
 					return data
 				},
 				set: async data => {
+					if (closed || !db.open) return
 					const writeTx = db.transaction(() => {
 						for (const category in data) {
 							for (const id in data[category as keyof SignalDataTypeMap]) {
@@ -134,6 +138,15 @@ export async function useSqliteAuthState(
 		},
 		saveCreds: () => {
 			persistCreds(creds)
+		},
+		close: () => {
+			closed = true
+			try {
+				db.pragma('wal_checkpoint(PASSIVE)')
+			} catch {}
+			try {
+				db.close()
+			} catch {}
 		}
 	}
 }
