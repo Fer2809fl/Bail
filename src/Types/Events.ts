@@ -1,4 +1,4 @@
-import type { Boom } from '@hapi/boom'
+import type { Boom } from '@neykoor/boom'
 import { proto } from '../../WAProto/index.js'
 import type { AuthenticationCreds, LIDMapping } from './Auth'
 import type { WACallEvent } from './Call'
@@ -176,4 +176,5 @@ export interface BaileysEventEmitter {
 	off<T extends keyof BaileysEventMap>(event: T, listener: (arg: BaileysEventMap[T]) => void): void
 	removeAllListeners<T extends keyof BaileysEventMap>(event: T): void
 	emit<T extends keyof BaileysEventMap>(event: T, arg: BaileysEventMap[T]): boolean
-}
+		}
+		
