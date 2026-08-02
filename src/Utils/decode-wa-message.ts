@@ -1,4 +1,5 @@
-import { Boom } from '@hapi/boom'
+import { Boom } from '@neykoor/boom'
+import { SessionError } from 'libsignal'
 import { proto } from '../../WAProto/index.js'
 import type { WAMessage, WAMessageKey } from '../Types'
 import type { SignalRepositoryWithLIDStore } from '../Types/Signal'
@@ -57,7 +58,7 @@ export const ACCOUNT_RESTRICTED_TEXT = 'Your account has been restricted'
 export const DECRYPTION_RETRY_CONFIG = {
 	maxRetries: 3,
 	baseDelayMs: 100,
-	sessionRecordErrors: ['No session record', 'SessionError: No session record']
+	sessionRecordErrors: ['No session record']
 }
 
 /** NACK reason codes we send to the server (client → server) */
@@ -388,6 +389,10 @@ export const decryptMessageNode = (
  * Utility function to check if an error is related to missing session record
  */
 function isSessionRecordError(error: any): boolean {
+	if (error instanceof SessionError) {
+		return true
+	}
+
 	const errorMessage = error?.message || error?.toString() || ''
 	return DECRYPTION_RETRY_CONFIG.sessionRecordErrors.some(errorPattern => errorMessage.includes(errorPattern))
 }
