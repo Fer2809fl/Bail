@@ -1,4 +1,4 @@
-import { Boom } from '@hapi/boom'
+import { Boom } from '@neykoor/boom'
 import { createHash } from 'crypto'
 import { createWriteStream, promises as fs } from 'fs'
 import { tmpdir } from 'os'
@@ -16,6 +16,7 @@ import type {
 } from '../Types'
 import { type BinaryNode, getBinaryNodeChild, getBinaryNodeChildren, getBinaryNodeChildString } from '../WABinary'
 import { generateMessageIDV2 } from './generics'
+import logger from './logger'
 import { getStream, getUrlFromDirectPath } from './messages-media'
 
 export const parseCatalogNode = (node: BinaryNode) => {
@@ -208,9 +209,6 @@ export const parseProductNode = (productNode: BinaryNode) => {
 	return product
 }
 
-/**
- * Uploads images not already uploaded to WA's servers
- */
 export async function uploadingNecessaryImagesOfProduct<T extends ProductUpdate | ProductCreate>(
 	product: T,
 	waUploadToServer: WAMediaUploadFunction,
@@ -225,9 +223,6 @@ export async function uploadingNecessaryImagesOfProduct<T extends ProductUpdate 
 	return product
 }
 
-/**
- * Uploads images not already uploaded to WA's servers
- */
 export const uploadingNecessaryImages = async (
 	images: WAMediaUpload[],
 	waUploadToServer: WAMediaUploadFunction,
@@ -253,6 +248,11 @@ export const uploadingNecessaryImages = async (
 				encFileWriteStream.write(block)
 			}
 
+			await new Promise<void>((resolve, reject) => {
+				encFileWriteStream.once('error', reject)
+				encFileWriteStream.end(resolve)
+			})
+
 			const sha = hasher.digest('base64')
 
 			const { directPath } = await waUploadToServer(filePath, {
@@ -261,7 +261,7 @@ export const uploadingNecessaryImages = async (
 				timeoutMs
 			})
 
-			await fs.unlink(filePath).catch(err => console.log('Error deleting temp file ', err))
+			await fs.unlink(filePath).catch(err => logger.warn({ err }, 'Error deleting temp file'))
 
 			return { url: getUrlFromDirectPath(directPath) }
 		})
