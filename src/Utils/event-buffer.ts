@@ -34,42 +34,25 @@ const BUFFERABLE_EVENT = [
 
 type BufferableEvent = (typeof BUFFERABLE_EVENT)[number]
 
-/**
- * A map that contains a list of all events that have been triggered
- *
- * Note, this can contain different type of events
- * this can make processing events extremely efficient -- since everything
- * can be done in a single transaction
- */
 type BaileysEventData = Partial<BaileysEventMap>
 
 const BUFFERABLE_EVENT_SET = new Set<BaileysEvent>(BUFFERABLE_EVENT)
 
 type BaileysBufferableEventEmitter = BaileysEventEmitter & {
-	/** Use to process events in a batch */
+
 	process(handler: (events: BaileysEventData) => void | Promise<void>): () => void
-	/**
-	 * starts buffering events, call flush() to release them
-	 * */
+
 	buffer(): void
-	/** buffers all events till the promise completes */
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 	createBufferedFunction<A extends any[], T>(work: (...args: A) => Promise<T>): (...args: A) => Promise<T>
-	/**
-	 * flushes all buffered events
-	 * @returns returns true if the flush actually happened, otherwise false
-	 */
+
 	flush(): boolean
-	/** is there an ongoing buffer */
+
 	isBuffering(): boolean
-	/** destroy the event buffer, clearing all resources */
+
 	destroy(): void
 }
 
-/**
- * The event buffer logically consolidates different events into a single event
- * making the data processing more efficient.
- */
 export const makeEventBuffer = (logger: ILogger): BaileysBufferableEventEmitter => {
 	const ev = new EventEmitter()
 	const historyCache = new Set<string>()
@@ -77,12 +60,12 @@ export const makeEventBuffer = (logger: ILogger): BaileysBufferableEventEmitter 
 	let data = makeBufferData()
 	let isBuffering = false
 	let bufferTimeout: NodeJS.Timeout | null = null
-	let flushPendingTimeout: NodeJS.Timeout | null = null // Add a specific timer for the debounced flush to prevent leak
+	let flushPendingTimeout: NodeJS.Timeout | null = null
+	let quickFlushTimeout: NodeJS.Timeout | null = null
 	let bufferCount = 0
-	const MAX_HISTORY_CACHE_SIZE = 10000 // Limit the history cache size to prevent memory bloat
-	const BUFFER_TIMEOUT_MS = 30000 // 30 seconds
+	const MAX_HISTORY_CACHE_SIZE = 10000
+	const BUFFER_TIMEOUT_MS = 30000
 
-	// take the generic event and fire it as a baileys event
 	ev.on('event', (map: BaileysEventData) => {
 		for (const event in map) {
 			ev.emit(event, map[event as keyof BaileysEventMap])
@@ -90,6 +73,16 @@ export const makeEventBuffer = (logger: ILogger): BaileysBufferableEventEmitter 
 	})
 
 	function buffer() {
+		if (flushPendingTimeout) {
+			clearTimeout(flushPendingTimeout)
+			flushPendingTimeout = null
+		}
+
+		if (quickFlushTimeout) {
+			clearTimeout(quickFlushTimeout)
+			quickFlushTimeout = null
+		}
+
 		if (!isBuffering) {
 			logger.debug('Event buffer activated')
 			isBuffering = true
@@ -107,7 +100,6 @@ export const makeEventBuffer = (logger: ILogger): BaileysBufferableEventEmitter 
 			}, BUFFER_TIMEOUT_MS)
 		}
 
-		// Always increment count when requested
 		bufferCount++
 	}
 
@@ -120,7 +112,6 @@ export const makeEventBuffer = (logger: ILogger): BaileysBufferableEventEmitter 
 		isBuffering = false
 		bufferCount = 0
 
-		// Clear timeout
 		if (bufferTimeout) {
 			clearTimeout(bufferTimeout)
 			bufferTimeout = null
@@ -131,7 +122,11 @@ export const makeEventBuffer = (logger: ILogger): BaileysBufferableEventEmitter 
 			flushPendingTimeout = null
 		}
 
-		// Clear history cache if it exceeds the max size
+		if (quickFlushTimeout) {
+			clearTimeout(quickFlushTimeout)
+			quickFlushTimeout = null
+		}
+
 		if (historyCache.size > MAX_HISTORY_CACHE_SIZE) {
 			logger.debug({ cacheSize: historyCache.size }, 'Clearing history cache')
 			historyCache.clear()
@@ -172,8 +167,7 @@ export const makeEventBuffer = (logger: ILogger): BaileysBufferableEventEmitter 
 			}
 		},
 		emit<T extends BaileysEvent>(event: BaileysEvent, evData: BaileysEventMap[T]) {
-			// Check if this is a messages.upsert with a different type than what's buffered
-			// If so, flush the buffered messages first to avoid type overshadowing
+
 			if (event === 'messages.upsert') {
 				const { type } = evData as BaileysEventMap['messages.upsert']
 				const existingUpserts = Object.values(data.messageUpserts)
@@ -181,21 +175,23 @@ export const makeEventBuffer = (logger: ILogger): BaileysBufferableEventEmitter 
 					const bufferedType = existingUpserts[0]!.type
 					if (bufferedType !== type) {
 						logger.debug({ bufferedType, newType: type }, 'messages.upsert type mismatch, emitting buffered messages')
-						// Emit the buffered messages with their correct type
+
 						ev.emit('event', {
 							'messages.upsert': {
 								messages: existingUpserts.map(m => m.message),
 								type: bufferedType
 							}
 						})
-						// Clear the message upserts from the buffer
+
 						data.messageUpserts = {}
 					}
 				}
 			}
 
 			if (isBuffering && BUFFERABLE_EVENT_SET.has(event)) {
-				append(data, historyCache, event as BufferableEvent, evData, logger)
+				append(data, historyCache, event as BufferableEvent, evData, logger, (immediateEvent, immediateData) =>
+					ev.emit('event', { [immediateEvent]: immediateData })
+				)
 				return true
 			}
 
@@ -211,13 +207,14 @@ export const makeEventBuffer = (logger: ILogger): BaileysBufferableEventEmitter 
 				buffer()
 				try {
 					const result = await work(...args)
-					// If this is the only buffer, flush after a small delay
+
 					if (bufferCount === 1) {
-						setTimeout(() => {
+						quickFlushTimeout = setTimeout(() => {
+							quickFlushTimeout = null
 							if (isBuffering && bufferCount === 1) {
 								flush()
 							}
-						}, 100) // Small delay to allow nested buffers
+						}, 100)
 					}
 
 					return result
@@ -226,7 +223,7 @@ export const makeEventBuffer = (logger: ILogger): BaileysBufferableEventEmitter 
 				} finally {
 					bufferCount = Math.max(0, bufferCount - 1)
 					if (bufferCount === 0) {
-						// Only schedule ONE timeout, not 10,000
+
 						if (!flushPendingTimeout) {
 							flushPendingTimeout = setTimeout(flush, 100)
 						}
@@ -238,7 +235,7 @@ export const makeEventBuffer = (logger: ILogger): BaileysBufferableEventEmitter 
 		off: (...args) => ev.off(...args),
 		removeAllListeners: (...args) => ev.removeAllListeners(...args),
 		destroy() {
-			// Clear buffer timeout
+
 			if (bufferTimeout) {
 				clearTimeout(bufferTimeout)
 				bufferTimeout = null
@@ -249,13 +246,17 @@ export const makeEventBuffer = (logger: ILogger): BaileysBufferableEventEmitter 
 				flushPendingTimeout = null
 			}
 
-			// Clear history cache
+			if (quickFlushTimeout) {
+				clearTimeout(quickFlushTimeout)
+				quickFlushTimeout = null
+			}
+
 			historyCache.clear()
-			// Reset buffer data
+
 			data = makeBufferData()
 			isBuffering = false
 			bufferCount = 0
-			// Remove all listeners
+
 			ev.removeAllListeners()
 			logger.debug('Event buffer destroyed')
 		}
@@ -289,9 +290,10 @@ function append<E extends BufferableEvent>(
 	data: BufferedEventData,
 	historyCache: Set<string>,
 	event: E,
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 	eventData: any,
-	logger: ILogger
+	logger: ILogger,
+	emitImmediate: (event: BaileysEvent, evData: any) => void
 ) {
 	switch (event) {
 		case 'messaging-history.set':
@@ -401,23 +403,19 @@ function append<E extends BufferableEvent>(
 				if (conditionMatches) {
 					delete update.conditional
 
-					// if there is an existing upsert, merge the update into it
 					const upsert = data.historySets.chats[chatId] || data.chatUpserts[chatId]
 					if (upsert) {
 						concatChats(upsert, update)
 					} else {
-						// merge the update into the existing update
+
 						const chatUpdate = data.chatUpdates[chatId] || {}
 						data.chatUpdates[chatId] = concatChats(chatUpdate, update)
 					}
 				} else if (conditionMatches === undefined) {
-					// condition yet to be fulfilled
+
 					data.chatUpdates[chatId] = update
 				}
-				// otherwise -- condition not met, update is invalid
 
-				// if the chat has been updated
-				// ignore any existing chat delete
 				if (data.chatDeletes.has(chatId)) {
 					data.chatDeletes.delete(chatId)
 				}
@@ -430,7 +428,6 @@ function append<E extends BufferableEvent>(
 					data.chatDeletes.add(chatId)
 				}
 
-				// remove any prior updates & upserts
 				if (data.chatUpdates[chatId]) {
 					delete data.chatUpdates[chatId]
 				}
@@ -473,12 +470,12 @@ function append<E extends BufferableEvent>(
 			const contactUpdates = eventData as BaileysEventMap['contacts.update']
 			for (const update of contactUpdates) {
 				const id = update.id!
-				// merge into prior upsert
+
 				const upsert = data.historySets.contacts[id] || data.contactUpserts[id]
 				if (upsert) {
 					Object.assign(upsert, update)
 				} else {
-					// merge into prior update
+
 					const contactUpdate = data.contactUpdates[id] || {}
 					data.contactUpdates[id] = Object.assign(contactUpdate, update)
 				}
@@ -525,9 +522,7 @@ function append<E extends BufferableEvent>(
 				const existing = data.historySets.messages[keyStr] || data.messageUpserts[keyStr]?.message
 				if (existing) {
 					Object.assign(existing, update)
-					// if the message was received & read by us
-					// the chat counter must have been incremented
-					// so we need to decrement it
+
 					if (update.status === WAMessageStatus.READ && !key.fromMe) {
 						decrementChatReadCounterIfMsgDidUnread(existing)
 					}
@@ -558,7 +553,19 @@ function append<E extends BufferableEvent>(
 					}
 				}
 			} else {
-				// TODO: add support
+				emitImmediate('messages.delete', deleteData)
+
+				for (const key of Object.keys(data.messageUpserts)) {
+					if (data.messageUpserts[key]!.message.key.remoteJid === deleteData.jid) {
+						delete data.messageUpserts[key]
+					}
+				}
+
+				for (const key of Object.keys(data.messageUpdates)) {
+					if (data.messageUpdates[key]!.key.remoteJid === deleteData.jid) {
+						delete data.messageUpdates[key]
+					}
+				}
 			}
 
 			break
@@ -595,9 +602,7 @@ function append<E extends BufferableEvent>(
 			for (const update of groupUpdates) {
 				const id = update.id!
 				const groupUpdate = data.groupUpdates[id] || {}
-				if (!data.groupUpdates[id]) {
-					data.groupUpdates[id] = Object.assign(groupUpdate, update)
-				}
+				data.groupUpdates[id] = Object.assign(groupUpdate, update)
 			}
 
 			break
@@ -623,8 +628,7 @@ function append<E extends BufferableEvent>(
 	}
 
 	function decrementChatReadCounterIfMsgDidUnread(message: WAMessage) {
-		// decrement chat unread counter
-		// if the message has already been marked read by us
+
 		const chatId = message.key.remoteJid!
 		const chat = data.chatUpdates[chatId] || data.chatUpserts[chatId]
 		if (
@@ -727,7 +731,7 @@ function consolidateEvents(data: BufferedEventData) {
 
 function concatChats<C extends Partial<Chat>>(a: C, b: Partial<Chat>) {
 	if (
-		b.unreadCount === null && // neutralize unread counter
+		b.unreadCount === null &&
 		a.unreadCount! < 0
 	) {
 		a.unreadCount = undefined
