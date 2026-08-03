@@ -301,6 +301,13 @@ export declare const makeMessagesSocket: (config: SocketConfig) => {
     extra?: Record<string, any>,
     options?: MiscMessageGenerationOptions,
   ) => Promise<any>;
+  sendLinkPreview: (
+    jid: string,
+    text: string,
+    url?: string,
+    extra?: Record<string, any>,
+    options?: MiscMessageGenerationOptions,
+  ) => Promise<any>;
   newsletterFetchAllSubscribe: () => Promise<unknown>;
   newsletterMultipleFollow: (jids: string) => Promise<void>;
   newsletterAction: (jid: string, type: string) => Promise<void>;
