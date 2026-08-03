@@ -150,6 +150,7 @@ export const getImageProcessingLibrary = async () => {
 	//@ts-ignore
 	const [jimp, sharp, napi] = await Promise.all([
 		import('jimp').catch(() => {}),
+		//@ts-ignore sharp is an optional peer dependency and may not ship types in every environment
 		import('sharp').catch(() => {}),
 		//@ts-ignore
 		import('@napi-rs/image').catch(() => {})
