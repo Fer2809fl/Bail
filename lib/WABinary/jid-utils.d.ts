@@ -45,13 +45,4 @@ export declare const isHostedLidUser: (jid: string | undefined) => boolean | und
 export declare const isJidBot: (jid: string | undefined) => boolean | "" | undefined;
 export declare const jidNormalizedUser: (jid: string | undefined) => string;
 export declare const transferDevice: (fromJid: string, toJid: string) => string;
-export type LidPhoneCache = {
-    set(lid: string | undefined, phoneJid: string | undefined): void;
-    get(key: string | undefined): string | undefined;
-    getLidForPhone(phoneJid: string | undefined): string | undefined;
-    getPhoneForLid(lid: string | undefined): string | undefined;
-    readonly size: number;
-};
-/** bidirectional LID<->PN in-memory cache, opportunistically populated while parsing binary nodes */
-export declare function createLidPhoneCache(): LidPhoneCache;
 //# sourceMappingURL=jid-utils.d.ts.map
