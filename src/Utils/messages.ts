@@ -186,6 +186,7 @@ export const generateStickerPackMessage = async (
 	}
 
 	const [sharpLib, jimpLib] = await Promise.all([
+		//@ts-ignore sharp is an optional peer dependency and may not ship types in every environment
 		import('sharp').catch(() => null),
 		import('jimp').catch(() => null)
 	])
