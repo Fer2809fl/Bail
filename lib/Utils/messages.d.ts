@@ -20,8 +20,6 @@ export declare const prepareDisappearingMessageSettingContent: (ephemeralExpirat
  */
 export declare const generateForwardMessageContent: (message: WAMessage, forceForward?: boolean) => proto.IMessage;
 export declare const hasNonNullishProperty: <K extends PropertyKey>(message: AnyMessageContent, key: K) => message is ExtractByKey<AnyMessageContent, K>;
-export declare const hasValidInteractiveHeader: (message: any) => boolean;
-export declare const hasValidCarouselHeader: (message: any) => boolean;
 export declare const generateWAMessageContent: (message: AnyMessageContent, options: MessageContentGenerationOptions) => Promise<proto.Message>;
 export declare const generateWAMessageFromContent: (jid: string, message: WAMessageContent, options: MessageGenerationOptionsFromContent) => WAMessage;
 export declare const generateWAMessage: (jid: string, content: AnyMessageContent, options: MessageGenerationOptions) => Promise<WAMessage>;
