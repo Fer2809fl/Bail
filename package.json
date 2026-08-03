@@ -1,8 +1,8 @@
 {
-  "name": "yo-soy-yo-baileys",
+  "name": "@fer2809fl/baileys",
   "type": "module",
-  "version": "0.7.14",
-  "description": "YO SOY YO BAILEYS - Modded Baileys v7 with interactive message, album, and newsletter support",
+  "version": "1.5.0",
+  "description": "BAILEYS",
   "license": "MIT",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
