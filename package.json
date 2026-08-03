@@ -3,7 +3,13 @@
   "type": "module",
   "version": "1.5.0",
   "description": "BAILEYS",
+  "homepage": "https://github.com/Fer2809fl/Bail",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Fer2809fl/Bail"
+  },
   "license": "MIT",
+  "author": "Fer2809fl",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "files": [
@@ -63,6 +69,9 @@
     "link-preview-js": {
       "optional": true
     }
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "engines": {
     "node": ">=20.0.0"
