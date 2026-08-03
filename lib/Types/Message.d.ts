@@ -6,8 +6,6 @@ import type { BinaryNode } from "../WABinary/index.js";
 import type { GroupMetadata } from "./GroupMetadata.js";
 import type { CacheStore } from "./Socket.js";
 export { proto as WAProto };
-export declare const CarouselCardType: typeof proto.Message.InteractiveMessage.CarouselMessage.CarouselCardType;
-export declare const ListType: typeof proto.Message.ListMessage.ListType;
 export type WAMessage = proto.IWebMessageInfo & {
   key: WAMessageKey;
   messageStubParameters?: any;
@@ -288,109 +286,8 @@ export type AnyRegularMessageContent = (
       Contextable)
   | SharePhoneNumber
   | RequestPhoneNumber
-  | ({
-      buttons: WAButtonContent[];
-      footer?: string;
-      text?: string;
-    } & Contextable &
-      Mentionable)
-  | ({
-      sections: WAListSection[];
-      title?: string;
-      buttonText: string;
-      footer?: string;
-      description: string;
-    } & Contextable &
-      Mentionable)
-  | ({
-      templateButtons: WATemplateButton[];
-      footer?: string;
-      id?: string;
-      text?: string;
-    } & Contextable)
-  | ({
-      nativeFlow:
-        | WAButtonContent[]
-        | {
-            buttons: WAButtonContent[];
-          };
-      footer?: string;
-      title?: string;
-      subtitle?: string;
-      text?: string;
-      audioFooter?: WAMediaUpload;
-    } & Contextable &
-      Mentionable)
-  | ({
-      cards: WACarouselCard[];
-      footer?: string;
-    } & Contextable)
-  | (proto.IMessage & {
-      raw: true;
-    })
 ) &
   ViewOnce;
-export type WAButtonContent = {
-  text?: string;
-  buttonText?: string;
-  icon?: string;
-} & (
-  | {
-      id: string;
-    }
-  | {
-      url: string;
-      useWebview?: boolean;
-    }
-  | {
-      call: string;
-    }
-  | {
-      copy: string;
-    }
-  | {
-      sections: WAListSection[];
-    }
-  | {
-      name: string;
-      paramsJson?: string;
-    }
-);
-export type WAListSection = {
-  title?: string;
-  rows: {
-    title: string;
-    rowId: string;
-    description?: string;
-  }[];
-};
-export type WATemplateButton =
-  | {
-      text?: string;
-      buttonText?: string;
-      id: string;
-    }
-  | {
-      text?: string;
-      buttonText?: string;
-      url: string;
-    }
-  | {
-      text?: string;
-      buttonText?: string;
-      call: string;
-    };
-export type WACarouselCard = {
-  text?: string;
-  caption?: string;
-  title?: string;
-  subtitle?: string;
-  footer?: string;
-  thumbnail?: WAMediaUpload;
-  audioFooter?: WAMediaUpload;
-  nativeFlow?: WAButtonContent[];
-} & AnyMediaMessageContent &
-  Contextable;
 export type AnyMessageContent =
   | AnyRegularMessageContent
   | {
