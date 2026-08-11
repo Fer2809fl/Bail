@@ -3,6 +3,22 @@ import type { GroupMetadata, ParticipantAction, SocketConfig, WAMessageKey } fro
 import { type BinaryNode } from '../WABinary/index.js';
 export declare const makeGroupsSocket: (config: SocketConfig) => {
     groupMetadata: (jid: string) => Promise<GroupMetadata>;
+    /** groupMetadata con cache de 30s, invalidado automáticamente ante cambios reales de participantes. */
+    groupMetadataCached: (jid: string) => Promise<GroupMetadata>;
+    /**
+     * Resuelve un jid/@lid a su jid de número de teléfono real usando primero los participantes
+     * del grupo y, si no hay coincidencia, el mapeo LID↔PN nativo de Baileys (signalRepository).
+     * @param jidOrChatId el chatId del grupo, o directamente el array de participantes ya obtenido
+     * @param targetJid el jid/lid a resolver
+     */
+    resolveParticipantJid: (jidOrChatId: string | GroupMetadata["participants"], targetJid: string) => Promise<string>;
+    /** true si el participante (jid o @lid) es admin/superadmin del grupo. */
+    isGroupAdmin: (jid: string, participantJid: string) => Promise<boolean>;
+    /** Lista de admins del grupo ya resueltos a jid de número de teléfono. */
+    getGroupAdmins: (jid: string) => Promise<{
+        jid: string;
+        admin: "admin" | "superadmin" | null;
+    }[]>;
     groupCreate: (subject: string, participants: string[]) => Promise<GroupMetadata>;
     groupLeave: (id: string) => Promise<void>;
     groupUpdateSubject: (jid: string, subject: string) => Promise<void>;
