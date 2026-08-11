@@ -16,6 +16,19 @@
 
 ---
 
+## 🆕 Novedades — v1.10.0
+
+### ✅ Nuevas funciones añadidas
+- **Detección de admins y resolución de JID/LID 100% nativa** — Antes, cada bot tenía que reimplementar a mano la comparación de `jid`, `@lid` y número de teléfono contra `groupMetadata` para saber si alguien es admin. Ahora esa lógica vive directamente en el socket:
+  - `isGroupAdmin(chatId, jid)` — `true`/`false` si ese participante (venga como número o como `@lid`) es admin o superadmin del grupo.
+  - `getGroupAdmins(chatId)` — lista de admins del grupo, ya resueltos a su jid de número de teléfono real (nunca `@lid`).
+  - `resolveParticipantJid(chatIdOrParticipants, jid)` — convierte cualquier `@lid` a su número real. Primero busca en los participantes del grupo; si no encuentra coincidencia, usa el mapeo LID↔PN nativo de WhatsApp (`signalRepository.lidMapping`) en vez de adivinar.
+  - `groupMetadataCached(chatId)` — igual que `groupMetadata`, pero con cache de 30s que se invalida solo apenas hay un alta, baja, ascenso o descenso real de participantes (via `group-participants.update`), para no golpear a WhatsApp en cada mensaje.
+
+  Esto es lo mismo que antes hacían los bots "a mano" con `groupMetadata` + comparaciones manuales de `id`/`lid`/`phoneNumber`, pero ahora resuelto por la librería, con cache y con el mapeo oficial de WhatsApp como respaldo.
+
+---
+
 ## 🆕 Novedades — v1.9.0
 
 ### ✅ Nuevas funciones añadidas
@@ -327,6 +340,39 @@ let handler = async (m, { conn, usedPrefix }) => {
 }
 
 handler.command = ['boton1', 'boton2', 'boton3', 'boton4', 'boton5', 'boton6']
+export default handler
+```
+
+---
+
+## 👑 Admins y resolución de JID/LID *(nuevo en v1.10.0)*
+
+No hace falta comparar `jid`/`@lid`/número a mano contra `groupMetadata`: usá estas funciones directo desde el socket.
+
+```javascript
+// ¿Es admin del grupo? (acepta jid normal o @lid, resuelve solo)
+const esAdmin = await melody.isGroupAdmin(m.chat, m.sender)
+
+// Lista de admins ya resueltos a número (nunca @lid)
+const admins = await melody.getGroupAdmins(m.chat)
+// [{ jid: '521418xxxxxxx@s.whatsapp.net', admin: 'superadmin' }, ...]
+
+// Resolver un @lid puntual (mención, quoted, etc.) a su número real
+const numeroReal = await melody.resolveParticipantJid(m.chat, mentionedJid)
+
+// groupMetadata con cache de 30s (se invalida solo con altas/bajas/promociones reales)
+const meta = await melody.groupMetadataCached(m.chat)
+```
+
+```javascript
+// plugins/admin-only.js
+let handler = async (m, { conn }) => {
+    if (!(await conn.isGroupAdmin(m.chat, m.sender))) {
+        return conn.sendMessage(m.chat, { text: '🔒 Solo admins pueden usar este comando.' })
+    }
+    // ...
+}
+handler.command = ['ejemplo']
 export default handler
 ```
 
