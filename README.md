@@ -90,29 +90,29 @@ Paquete npm: [npmjs.com/package/@fer2809fl/baileys](https://www.npmjs.com/packag
 const { makeWASocket, useMultiFileAuthState } = require('@fer2809fl/baileys')
 
 async function startBot() {
-    const { state, saveCreds } = await useMultiFileAuthState('session-mymelody')
+    const { state, saveCreds } = await useMultiFileAuthState('session-myfer')
 
-    const melody = makeWASocket({
+    const fer = makeWASocket({
         auth: state,
         printQRInTerminal: true,
         generateHighQualityLinkPreview: true // recomendado para que las previews se vean mejor
     })
 
-    melody.ev.on('connection.update', ({ connection }) => {
+    fer.ev.on('connection.update', ({ connection }) => {
         if (connection === 'open') console.log('✅ ¡Conectado con éxito!')
         if (connection === 'close') console.log('❌ Conexión cerrada, reconectando...')
     })
 
-    melody.ev.on('messages.upsert', async ({ messages }) => {
+    fer.ev.on('messages.upsert', async ({ messages }) => {
         const m = messages[0]
         if (!m.message) return
 
-        await melody.sendMessage(m.key.remoteJid, {
-            text: '¡Hola! Soy un bot de Delta!'
+        await fer.sendMessage(m.key.remoteJid, {
+            text: '¡Hola! Soy un bot de Fer!'
         })
     })
 
-    melody.ev.on('creds.update', saveCreds)
+    fer.ev.on('creds.update', saveCreds)
 }
 
 startBot()
@@ -122,7 +122,7 @@ startBot()
 
 ## 🔘 Botones Interactivos *(actualizado en v1.9.0)*
 
-A diferencia de otras librerías, acá **no se importan funciones sueltas**: los botones son métodos que ya están directamente en el socket que devuelve `makeWASocket`. Solo llamalos desde `sock` (o como hayas nombrado tu conexión, `melody` en los ejemplos).
+A diferencia de otras librerías, acá **no se importan funciones sueltas**: los botones son métodos que ya están directamente en el socket que devuelve `makeWASocket`. Solo llamalos desde `sock` (o como hayas nombrado tu conexión, `fer` en los ejemplos).
 
 Todos aceptan al final un objeto `extra` opcional (`footer`, `image`, `video`, `document`, `quoted`) y uno de `options` para lo que ya soporta `sendMessage` normalmente.
 
@@ -131,7 +131,7 @@ Todos aceptan al final un objeto `extra` opcional (`footer`, `image`, `video`, `
 ### ⚡ `sendQuickReplyButtons` — Botones de Respuesta Rápida
 
 ```javascript
-await melody.sendQuickReplyButtons(
+await fer.sendQuickReplyButtons(
     jid,
     '🎮 *MENÚ DE OPCIONES*\n\n¿Qué deseas hacer?',
     [
@@ -149,7 +149,7 @@ await melody.sendQuickReplyButtons(
 Genera solo la tarjeta de previsualización (imagen, título, descripción) del link del botón.
 
 ```javascript
-await melody.sendUrlButton(
+await fer.sendUrlButton(
     jid,
     '🔗 *ENLACES IMPORTANTES*\n\nVisita nuestro repositorio oficial:',
     '🌐 Ver GitHub',                             // etiqueta del botón
@@ -162,7 +162,7 @@ await melody.sendUrlButton(
 ### 📞 `sendCallButton` — Botón de Llamada
 
 ```javascript
-await melody.sendCallButton(
+await fer.sendCallButton(
     jid,
     '📞 *SOPORTE TÉCNICO*\n\n¿Necesitas ayuda? Llámanos:',
     '📞 Llamar Ahora',   // etiqueta del botón
@@ -175,7 +175,7 @@ await melody.sendCallButton(
 ### 📋 `sendCopyButton` — Botón Copiar
 
 ```javascript
-await melody.sendCopyButton(
+await fer.sendCopyButton(
     jid,
     '📋 *CÓDIGO DE INSTALACIÓN*\n\nEjecuta este comando en tu terminal:',
     '📋 Copiar Comando',      // etiqueta del botón
@@ -188,7 +188,7 @@ await melody.sendCopyButton(
 ### ⏰ `sendReminderButton` — Botón de Recordatorio
 
 ```javascript
-await melody.sendReminderButton(
+await fer.sendReminderButton(
     jid,
     '⏰ *RECORDATORIO*\n\nActiva un aviso para no olvidarlo:',
     '⏰ Recordarme'
@@ -200,7 +200,7 @@ await melody.sendReminderButton(
 ### 📋 `sendListButton` — Menú Desplegable (Lista)
 
 ```javascript
-await melody.sendListButton(
+await fer.sendListButton(
     jid,
     '📋 *SELECCIONA UNA OPCIÓN*',
     'Menú Principal',  // título del botón que abre la lista
@@ -232,7 +232,7 @@ await melody.sendListButton(
 Para armar cualquier combinación libre de tipos (o alguno que no tenga método propio) en un solo mensaje.
 
 ```javascript
-await melody.sendMixedButtons(
+await fer.sendMixedButtons(
     jid,
     '🎯 *PANEL DE CONTROL*\n\nSelecciona una acción rápida:',
     [
@@ -250,7 +250,7 @@ await melody.sendMixedButtons(
 `sendLinkPreview` manda solo texto + una tarjeta grande y prolija con la imagen, título y descripción de cualquier URL — igual que un mensaje normal de WhatsApp con link, pero forzando `renderLargerThumbnail` para que se vea mejor. Sirve para links a fotos, artículos, redes sociales, lo que sea.
 
 ```javascript
-await melody.sendLinkPreview(
+await fer.sendLinkPreview(
     jid,
     '¡Mirá esto! 👀',
     'https://github.com/Fer2809fl/Baileys'
@@ -260,7 +260,7 @@ await melody.sendLinkPreview(
 Si el texto ya trae el link adentro, no hace falta pasarlo aparte:
 
 ```javascript
-await melody.sendLinkPreview(
+await fer.sendLinkPreview(
     jid,
     'Repo oficial: https://github.com/Fer2809fl/Baileys'
 )
@@ -269,7 +269,7 @@ await melody.sendLinkPreview(
 Esta misma previsualización se activa automáticamente en `sendUrlButton` y en cualquier otro botón si el texto trae un link. Para desactivarla en un envío puntual:
 
 ```javascript
-await melody.sendUrlButton(jid, texto, '🌐 Ver más', url, { preview: false })
+await fer.sendUrlButton(jid, texto, '🌐 Ver más', url, { preview: false })
 ```
 
 ---
@@ -351,17 +351,17 @@ No hace falta comparar `jid`/`@lid`/número a mano contra `groupMetadata`: usá 
 
 ```javascript
 // ¿Es admin del grupo? (acepta jid normal o @lid, resuelve solo)
-const esAdmin = await melody.isGroupAdmin(m.chat, m.sender)
+const esAdmin = await fer.isGroupAdmin(m.chat, m.sender)
 
 // Lista de admins ya resueltos a número (nunca @lid)
-const admins = await melody.getGroupAdmins(m.chat)
+const admins = await fer.getGroupAdmins(m.chat)
 // [{ jid: '521418xxxxxxx@s.whatsapp.net', admin: 'superadmin' }, ...]
 
 // Resolver un @lid puntual (mención, quoted, etc.) a su número real
-const numeroReal = await melody.resolveParticipantJid(m.chat, mentionedJid)
+const numeroReal = await fer.resolveParticipantJid(m.chat, mentionedJid)
 
 // groupMetadata con cache de 30s (se invalida solo con altas/bajas/promociones reales)
-const meta = await melody.groupMetadataCached(m.chat)
+const meta = await fer.groupMetadataCached(m.chat)
 ```
 
 ```javascript
