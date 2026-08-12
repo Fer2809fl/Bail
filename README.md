@@ -16,7 +16,7 @@
 
 ---
 
-## 🆕 Novedades — v1.10.0
+## 🆕 Novedades — v7.0.2
 
 ### ✅ Nuevas funciones añadidas
 - **Detección de admins y resolución de JID/LID 100% nativa** — Antes, cada bot tenía que reimplementar a mano la comparación de `jid`, `@lid` y número de teléfono contra `groupMetadata` para saber si alguien es admin. Ahora esa lógica vive directamente en el socket:
