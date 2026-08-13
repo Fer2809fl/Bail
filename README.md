@@ -29,7 +29,7 @@
 
 ---
 
-## 🆕 Novedades — v7.2.0
+## 🆕 Novedades — v7.0.1
 
 ### ✅ Nuevas funciones añadidas
 - **Botones nativos reales** — Se agregaron métodos directos en el socket para enviar botones interactivos de WhatsApp (native flow), reemplazando el viejo formato `buttons: [{text, id}]` que ya no renderiza en WhatsApp:
