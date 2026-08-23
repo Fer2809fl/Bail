@@ -16,7 +16,7 @@
 
 ---
 
-## 🆕 Novedades — v7.0.3
+## 🆕 Novedades — v7.0.4
 
 Actualización de estabilidad y sincronización con las últimas mejoras del protocolo de WhatsApp Web.
 
