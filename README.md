@@ -18,6 +18,40 @@
 
 ## 🆕 Novedades — v7.0.3
 
+Actualización de estabilidad y sincronización con las últimas mejoras del protocolo de WhatsApp Web.
+
+### ✅ Nuevas funciones añadidas
+- **`withUsernameProtocol()`** en `USyncQuery` — permite sincronizar contactos por *username* de WhatsApp (la nueva forma de identificar cuentas, además del número de teléfono):
+  ```javascript
+  const result = await sock.executeUSyncQuery(
+    new USyncQuery().withUsernameProtocol().withUser(new USyncUser().withPhone('+123...'))
+  )
+  ```
+- **`sock.fetchAccountReachoutTimelock()`** — consulta si tu cuenta tiene alguna restricción activa para iniciar chats nuevos, y hasta cuándo dura.
+- **`sock.fetchNewChatMessageCap()`** — consulta el límite de mensajes que puedes enviar a chats/números nuevos (cupo anti-spam de WhatsApp).
+- **`sock.registerSocketEndHandler(handler)`** — registra una función que se ejecuta automáticamente cada vez que la conexión se cierra (útil para limpieza de recursos propios sin tener que escuchar `connection.update` a mano).
+- **Nuevo formato de código QR de emparejamiento** — el QR ahora incluye el identificador de plataforma del companion, igual que el WhatsApp Web oficial (mejora la tasa de éxito al vincular).
+
+### 🐛 Correcciones de estabilidad y memoria
+- **Fuga de memoria en el buffer de eventos** — se agregó limpieza real de timers, cachés y listeners al cerrar una conexión (`ev.destroy()`), evitando que la memoria crezca con reconexiones frecuentes.
+- **Loop de reintentos por fallas de descifrado (MAC)** — se agregó detección de colisión de "base key" en reintentos de mensajes: si WhatsApp reenvía el mismo mensaje repetidamente por un fallo de sesión, la librería ahora detecta el patrón y fuerza una sesión nueva en vez de reintentar indefinidamente.
+- **Duplicados al sincronizar historial de grupos** — se corrigió el merge de "participantes que salieron" (`pastParticipants`) para no duplicar entradas cuando WhatsApp envía el historial en varios paquetes.
+- **IDs de consulta de canales (newsletters) desactualizados** — los IDs internos de `FOLLOW`/`UNFOLLOW` de canales estaban vencidos y podían empezar a fallar silenciosamente; se actualizaron a los vigentes.
+- **Versión de protocolo de WhatsApp Web actualizada** — reduce el riesgo de desconexiones forzadas por versión obsoleta.
+- **Dependencias actualizadas**: `libsignal` ahora se instala desde npm (antes requería `git` instalado en el servidor), `whatsapp-rust-bridge`, `protobufjs` y otras al día.
+
+> Nota: las funciones de auto-follow de canales, el motor de envío de mensajes (`sendMessage` y helpers internos) y el manejo avanzado de negocios (`business.js`) son personalizaciones propias de este fork — se mantuvieron intactas durante esta actualización.
+
+### 🔧 Fusión profunda adicional
+- **`chats.js` reconstruido sobre la base oficial**: recuperación automática de sincronización de estado cuando falta una clave (antes fallaba silenciosamente), resolución correcta de bloqueo de contactos por LID/PN, y tracking de finalización de sincronización de historial.
+- **`groups.js` reconstruido**: mejor resolución de LID/PN en metadata de grupos + tus funciones `isGroupAdmin`, `getGroupAdmins`, `resolveParticipantJid`, `groupMetadataCached` intactas.
+- **`business.js` alineado al oficial** (era funcionalmente idéntico, solo cambiaba el estilo del código).
+- **Endpoint de canales actualizado**: WhatsApp movió `newsletterFollow`/`newsletterUnfollow` a un endpoint nuevo (`_v2`); se actualizó, incluyendo tu sistema de auto-follow interno, para que siga funcionando.
+
+---
+
+
+
 ### ✅ Nuevas funciones añadidas
 - **Detección de admins y resolución de JID/LID 100% nativa** — Antes, cada bot tenía que reimplementar a mano la comparación de `jid`, `@lid` y número de teléfono contra `groupMetadata` para saber si alguien es admin. Ahora esa lógica vive directamente en el socket:
   - `isGroupAdmin(chatId, jid)` — `true`/`false` si ese participante (venga como número o como `@lid`) es admin o superadmin del grupo.
@@ -74,7 +108,7 @@ yarn add github:Fer2809fl/Baileys
 ```json
 {
   "dependencies": {
-    "@fer2809fl/baileys": "^1.9.0"
+    "@fer2809fl/baileys": "^1.11.0"
   }
 }
 ```
