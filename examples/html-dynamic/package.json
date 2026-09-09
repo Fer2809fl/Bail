@@ -1,0 +1,24 @@
+{
+  "name": "baileys-html-dynamic-example",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Demo de HTML embebido en WhatsApp con estado persistente via backend + SQLite",
+  "scripts": {
+    "start:bot": "node bot-command.js",
+    "start:server": "node server.js",
+    "start": "concurrently -n bot,server -c blue,green \"npm:start:bot\" \"npm:start:server\"",
+    "db:init": "node db.js init"
+  },
+  "dependencies": {
+    "@nyxthor-dev/baileys": "file:../..",
+    "better-sqlite3": "^11.0.0",
+    "express": "^4.19.0",
+    "jsonwebtoken": "^9.0.2",
+    "pino": "^9.0.0",
+    "qrcode-terminal": "^0.12.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  }
+}

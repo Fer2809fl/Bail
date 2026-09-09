@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+body{margin:0;background:transparent;font-family:system-ui,sans-serif;color:#eee;touch-action:manipulation;cursor:pointer}
+.wrap{max-width:560px;margin:auto;padding:12px}
+.card{background:rgba(255,255,255,.06);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.15);border-radius:14px;overflow:hidden}
+.card .hd{padding:12px 14px;display:flex;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.1)}
+.card .hd h1{font-size:14px;margin:0;font-weight:600}
+.card .hd .user{font-size:10px;color:rgba(255,255,255,.45);letter-spacing:.5px}
+.card .hd .score{font-size:18px;font-weight:700;color:#a3e635;text-shadow:0 0 8px rgba(163,230,53,.6)}
+.card .hd .score small{display:block;font-size:9px;color:rgba(255,255,255,.35);font-weight:400;margin-top:2px}
+.card .bd{padding:10px}
+canvas{width:100%;height:auto;background:rgba(0,0,0,.25);border-radius:8px;display:block}
+.card .ft{padding:8px 14px;font-size:10px;color:rgba(255,255,255,.4);text-align:center}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%) translateY(20px);background:rgba(0,0,0,.85);color:#a3e635;padding:8px 16px;border-radius:8px;font-size:12px;opacity:0;transition:.3s;pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <div class="hd">
+      <div>
+        <h1>Dino Runner Pro</h1>
+        <div class="user" id="user">__USER__</div>
+      </div>
+      <div class="score">
+        <span id="score">00000</span>
+        <small id="best">BEST 00000</small>
+      </div>
+    </div>
+    <div class="bd">
+      <canvas id="game" width="540" height="170"></canvas>
+    </div>
+    <div class="ft">Toca para saltar · estado guardado en tu servidor</div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+// Estado inicial inyectado por el bot al renderizar.
+// window.__INITIAL__ = { jid, best, token, apiBase }
+const INIT = window.__INITIAL__ || { jid:"?", best:0, token:"", apiBase:"" };
+const API = INIT.apiBase;
+
+document.getElementById('user').textContent = 'JID ' + INIT.jid.split('@')[0];
+
+const c = document.getElementById('game');
+const x = c.getContext('2d');
+const scoreEl = document.getElementById('score');
+const bestEl = document.getElementById('best');
+const toastEl = document.getElementById('toast');
+
+const GY = 150;
+let d, obs, score, best, speed, gameOver, last, runT, spawnTimer;
+
+best = INIT.best | 0;
+bestEl.textContent = 'BEST ' + String(best).padStart(5,'0');
+
+function reset(){
+  d = { x:50, y:120, w:24, h:28, vy:0, jumping:false };
+  obs = [];
+  score = 0; speed = 5; gameOver = false; last = 0; runT = 0;
+  spawnTimer = 80;
+  scoreEl.textContent = '00000';
+}
+function showToast(msg, ms=2200){
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  setTimeout(()=>toastEl.classList.remove('show'), ms);
+}
+async function submitScore(s){
+  if(!API || !INIT.token){
+    showToast('Sin API configurada');
+    return;
+  }
+  try{
+    const res = await fetch(API + '/score', {
+      method:'POST',
+      headers:{
+        'Authorization':'Bearer ' + INIT.token,
+        'Content-Type':'application/json'
+      },
+      body: JSON.stringify({ score: Math.floor(s) })
+    });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    if(data.isNewRecord){
+      showToast('🏆 Nuevo récord: ' + data.best);
+    } else {
+      showToast('Puntaje enviado ('+Math.floor(s)+')');
+    }
+    best = data.best;
+    bestEl.textContent = 'BEST ' + String(best).padStart(5,'0');
+  } catch(e){
+    showToast('Error: ' + e.message);
+  }
+}
+function jump(){
+  if(gameOver){
+    submitScore(score);
+    reset();
+    return;
+  }
+  if(!d.jumping){
+    d.jumping = true;
+    d.vy = -12;
+  }
+}
+function spawnObstacle(){
+  const h = 22 + Math.random()*22;
+  obs.push({ x:c.width+10, y:GY-h, w:14, h });
+}
+function hit(a,b){
+  return a.x+3<b.x+b.w && a.x+a.w-3>b.x && a.y+3<b.y+b.h && a.y+a.h>b.y;
+}
+function draw(){
+  x.clearRect(0,0,c.width,c.height);
+  // ground
+  x.strokeStyle='rgba(255,255,255,.2)';
+  x.lineWidth=2;
+  x.setLineDash([8,6]);
+  x.lineDashOffset=-runT*speed*.6;
+  x.beginPath(); x.moveTo(0,GY); x.lineTo(c.width,GY); x.stroke();
+  x.setLineDash([]);
+  // dino
+  x.fillStyle='#a3e635';
+  x.fillRect(d.x, d.y, d.w, d.h);
+  // obstacles
+  x.fillStyle='#f87171';
+  obs.forEach(o=>x.fillRect(o.x,o.y,o.w,o.h));
+  // score text
+  x.fillStyle='rgba(255,255,255,.5)';
+  x.font='10px sans-serif';
+  x.fillText('vel '+speed.toFixed(1)+'x', 6, 12);
+  if(gameOver){
+    x.fillStyle='rgba(0,0,0,.5)';
+    x.fillRect(0,0,c.width,c.height);
+    x.fillStyle='#fff';
+    x.textAlign='center';
+    x.font='bold 18px sans-serif';
+    x.fillText('GAME OVER', c.width/2, 80);
+    x.font='11px sans-serif';
+    x.fillText('Toca para reiniciar y enviar score', c.width/2, 102);
+    x.textAlign='left';
+  }
+}
+function loop(t){
+  if(!last) last = t;
+  const dt = Math.min((t-last)/16.67, 2);
+  last = t;
+  runT += dt;
+  if(!gameOver){
+    d.y += d.vy*dt;
+    d.vy += .7*dt;
+    if(d.y >= 120){ d.y=120; d.vy=0; d.jumping=false; }
+    spawnTimer -= dt;
+    if(spawnTimer <= 0){
+      spawnObstacle();
+      spawnTimer = Math.max(40, 70 - speed) + Math.random()*30;
+    }
+    obs.forEach(o=>o.x -= speed*dt);
+    obs = obs.filter(o=>o.x > -30);
+    speed = Math.min(11, speed + .002*dt);
+    score += dt*.6;
+    scoreEl.textContent = String(Math.floor(score)).padStart(5,'0');
+    for(const o of obs) if(hit(d,o)){
+      gameOver = true;
+      // Disparar envío del score apenas se muere.
+      submitScore(score);
+      break;
+    }
+  }
+  draw();
+  requestAnimationFrame(loop);
+}
+document.addEventListener('pointerdown', e=>{e.preventDefault();jump()});
+document.addEventListener('keydown', e=>{if(e.code==='Space'){e.preventDefault();jump()}});
+reset();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

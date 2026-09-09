@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS scores (
+  jid TEXT PRIMARY KEY,
+  best INTEGER NOT NULL DEFAULT 0,
+  games_played INTEGER NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
