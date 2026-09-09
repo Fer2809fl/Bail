@@ -23,6 +23,7 @@ import {
   type LatexRenderFn,
   type MediaUploadFn,
   type CapturedUnifiedResponse,
+  type HtmlContentOptions,
 } from "../Utils/rich-messages.js";
 import { type BinaryNode, type JidWithDevice } from "../WABinary/index.js";
 import { USyncQuery } from "../WAUSync/index.js";
@@ -231,6 +232,23 @@ export declare const makeMessagesSocket: (config: SocketConfig) => {
     submessages: proto.IAIRichResponseSubMessage[],
     quoted?: any,
     options?: {},
+  ) => Promise<{
+    message: any;
+    messageId: string;
+  }>;
+  /**
+   * Envía un mensaje HTML embebido en WhatsApp. El cliente lo renderiza como
+   * un WebView sandboxed dentro del bocadillo del mensaje, usando el campo
+   * interno `GenAIaeacdsnwHtmlPrimitive` del protocolo AIRichResponseMessage.
+   *
+   * Ver `HtmlContentOptions` y el README para limitaciones y patrón recomendado.
+   */
+  sendHtml: (
+    jid: string,
+    html: string,
+    trustedSources?: string[],
+    quoted?: any,
+    options?: HtmlContentOptions,
   ) => Promise<{
     message: any;
     messageId: string;
