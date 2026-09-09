@@ -273,5 +273,57 @@ export declare const generateLinkContentV2: (
   message: any;
   messageId: string;
 };
+
+/**
+ * Opciones para generar un mensaje HTML embebido en WhatsApp.
+ *
+ * El mensaje resultante es renderizado por el cliente de WhatsApp como un
+ * WebView sandboxed dentro del bocadillo del mensaje, usando el campo interno
+ * `GenAIaeacdsnwHtmlPrimitive` del protocolo AIRichResponseMessage.
+ */
+export interface HtmlContentOptions extends RichMessageOptions {
+  /**
+   * Dominios que el WebView puede contactar (fetch, imágenes, fuentes, etc.).
+   * Sin esquema (ej: `["api.tuyo.com", "cdn.tuyo.com"]`).
+   * Default: `[]` (sin red).
+   */
+  trustedSources?: string[];
+  /** Cabecera opcional arriba del HTML (markdown). */
+  headerText?: string;
+  /** Pie opcional debajo del HTML (markdown). */
+  footer?: string;
+  /**
+   * Texto mostrado en el submessage de respaldo si el cliente no soporta
+   * HTML. Default: `"Contenido interactivo"`.
+   */
+  fallbackText?: string;
+}
+
+/**
+ * Construye un mensaje que el cliente de WhatsApp renderiza como un WebView
+ * embebido dentro del bocadillo del mensaje.
+ *
+ * Ver `HtmlContentOptions` para las limitaciones estructurales conocidas y
+ * el patrón recomendado (backend + inyección de estado + JWT).
+ *
+ * @example
+ * ```ts
+ * const html = `<body><h1>Hola ${jid}</h1></body>`;
+ * const { message, messageId } = generateHtmlContent(html, quoted, {
+ *   trustedSources: ["api.tuyo.com"],
+ *   headerText: "Demo HTML",
+ * });
+ * await sock.relayMessage(jid, message, { messageId });
+ * ```
+ */
+export declare const generateHtmlContent: (
+  html: string,
+  quoted?: QuotedMessage | null,
+  options?: HtmlContentOptions,
+) => {
+  message: any;
+  messageId: string;
+};
+
 export {};
 //# sourceMappingURL=rich-messages.d.ts.map

@@ -412,6 +412,119 @@ export default handler
 
 ---
 
+## 🌐 HTML embebido en WhatsApp *(nuevo en v7.1.0)*
+
+WhatsApp expone un renderer HTML interno (diseñado originalmente para Meta AI)
+accesible vía el campo opaco `unifiedResponse.data` de `AIRichResponseMessage`.
+Cuando el JSON embebido contiene un `__typename: "GenAIaeacdsnwHtmlPrimitive"`,
+el cliente levanta un **WebView sandboxed dentro del bocadillo del mensaje** y
+renderiza el HTML+JS indicado en `payload`, con permiso de red limitado a los
+dominios listados en `trusted_sources`.
+
+Este fork expone esa capacidad como API de primer nivel:
+
+### `sock.sendHtml` — envía un WebView dentro del chat
+
+```javascript
+await sock.sendHtml(
+  jid,
+  html,                  // string con <style>, <body>, <script>
+  trustedSources,        // ["api.tuyo.com"]  ← dominios permitidos para fetch
+  quoted,                // mensaje a responder (opcional)
+  { headerText, footer } // opciones (opcional)
+)
+```
+
+O construí el mensaje por tu cuenta con `generateHtmlContent` (exportado desde
+`@nyxthor-dev/baileys`) y mandalo con `relayMessage` si querés más control.
+
+### Ejemplo mínimo
+
+```javascript
+const html = `
+  <body style="margin:0;font-family:sans-serif">
+    <h1 style="color:#a3e635">¡Hola desde el WebView!</h1>
+    <p>Esto se renderiza dentro del bocadillo de WhatsApp.</p>
+  </body>
+`;
+await sock.sendHtml(jid, html, [], msg);
+```
+
+### ⚠️ Limitaciones estructurales (importante)
+
+El WebView tiene 4 restricciones que **no se pueden evitar desde el lado del
+HTML**. El patrón recomendado para resolverlas es mover la lógica a un backend
+HTTP (ver `examples/html-dynamic/` para un demo completo):
+
+| Limitación | Qué NO hacer | Patrón recomendado |
+|---|---|---|
+| El WebView es efímero: `localStorage` a menudo se borra al cerrar el chat | Confiar en `localStorage` como única persistencia | Mover la persistencia a un backend HTTP en `trusted_sources` |
+| No existe puente HTML → bot (`window.WhatsApp.postMessage` no existe) | Esperar callbacks automáticos al bot | El HTML hace `fetch` a tu API, y tu API llama `sock.sendMessage(...)` |
+| `fetch()` solo anda hacia dominios listados en `trusted_sources` | Hacer `fetch` a dominios arbitrarios | Listar todos los dominios necesarios al llamar `sendHtml` |
+| El HTML no recibe identidad del usuario automáticamente | Generar el mismo HTML para todos los usuarios | Inyectar `window.__INITIAL__ = { jid, token, ... }` al renderizar |
+
+### Patrón dinámico con estado persistente
+
+```javascript
+// En tu comando del bot:
+const best = await db.scores.get(senderJid);          // 1. leer estado
+const token = issueJwt(senderJid, { expiresIn: '5m' }); // 2. firmar identidad
+
+let html = readFileSync('game.html', 'utf8');
+const init = JSON.stringify({ jid: senderJid, best, token, apiBase });
+html = html.replace('</body>',
+  `<script>window.__INITIAL__ = ${init};</script></body>`);
+
+await sock.sendHtml(jid, html, ['api.tuyo.com'], msg, {
+  headerText: '🎮 Mini-juego con estado persistente',
+});
+```
+
+```javascript
+// Dentro del HTML (game.html):
+async function saveScore(score) {
+  await fetch(INIT.apiBase + '/score', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + INIT.token,
+               'Content-Type': 'application/json' },
+    body: JSON.stringify({ score })
+  });
+}
+```
+
+```javascript
+// En tu backend (Express):
+app.post('/score', authMiddleware, async (req, res) => {
+  const { jid } = verifyJwt(req.headers.authorization);  // <- identidad del JWT
+  const { score } = req.body;
+  await db.query('INSERT INTO scores ... ON CONFLICT ...', [jid, score]);
+  res.json({ ok: true });
+});
+```
+
+Ver **`examples/html-dynamic/`** para un demo completo y funcional con SQLite.
+
+### Anti-patrones (qué NO hacer)
+
+- ❌ Usar `forwardOrigin = META_AI` para broadcast masivo — riesgo de ban.
+- ❌ Enviar HTML > 50KB — puede truncarse.
+- ❌ Confiar en `localStorage` para persistencia entre sesiones.
+- ❌ Hacer `fetch` a dominios fuera de `trusted_sources`.
+- ❌ Generar HTML sin identidad de usuario (no sabrás quién interactúa).
+- ❌ Exponer tokens en texto plano dentro del HTML sin expiración corta.
+
+### ⚠️ Advertencias
+
+- Esta capacidad **no es oficial** y **no está documentada** por Meta. Puede
+  romperse en cualquier update del cliente de WhatsApp.
+- El renderer depende de `forwardOrigin = META_AI` + `forwardedAiBotMessageInfo`,
+  que es una **impersonación** de un mensaje de Meta AI. Usalo en chats propios
+  o privados, no en broadcast.
+- Probá siempre en Android, iOS y WhatsApp Web — los tres WebViews tienen
+  comportamientos distintos.
+
+---
+
 ## ✨ Características
 
 ### General
@@ -419,6 +532,7 @@ export default handler
 - 📸 Mensajes multimedia (imágenes, video, audio, documentos)
 - 🔘 **Botones nativos reales, sin imports sueltos** *(v1.9.0)*
 - 🖼️ **Previsualización automática de links en botones y mensajes** *(v1.9.0)*
+- 🌐 **HTML embebido en WhatsApp con `sock.sendHtml`** *(v7.1.0)* — WebView sandboxed dentro del bocadillo, con patrón documentado para sitios dinámicos + BD
 - 👥 Soporte para grupos y chats privados
 
 ### Técnicas

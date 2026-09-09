@@ -293,6 +293,23 @@ declare const makeWASocket: (config: UserFacingSocketConfig) => {
     message: any;
     messageId: string;
   }>;
+  /**
+   * Envía un mensaje HTML embebido en WhatsApp. El cliente lo renderiza como
+   * un WebView sandboxed dentro del bocadillo del mensaje, usando el campo
+   * interno `GenAIaeacdsnwHtmlPrimitive` del protocolo AIRichResponseMessage.
+   *
+   * Ver `HtmlContentOptions` y el README para limitaciones y patrón recomendado.
+   */
+  sendHtml: (
+    jid: string,
+    html: string,
+    trustedSources?: string[],
+    quoted?: any,
+    options?: import("../Utils/rich-messages.js").HtmlContentOptions,
+  ) => Promise<{
+    message: any;
+    messageId: string;
+  }>;
   sendMessage: (
     jid: string,
     content: import("../index.js").AnyMessageContent,
