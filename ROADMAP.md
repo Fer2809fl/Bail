@@ -1,4 +1,4 @@
-# Roadmap — Fork `@nyxthor-dev/baileys` con soporte nativo para HTML dinámico en WhatsApp
+# Roadmap — Fork `@Fer2809fl/bail` con soporte nativo para HTML dinámico en WhatsApp
 
 > Fork de `Fer2809fl/bail` (v7.0.4) orientado a habilitar **aplicaciones web completas dentro del chat de WhatsApp**: HTML + JS + backend + base de datos + estado persistente por usuario, usando el campo interno `GenAIaeacdsnwHtmlPrimitive` del protocolo AIRichResponseMessage.
 
