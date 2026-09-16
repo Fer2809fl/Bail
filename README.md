@@ -16,6 +16,121 @@
 
 ---
 
+## 🆕 Novedades — v7.0.5
+
+Tanda de mantenimiento: se revisó el fork "beta" del proyecto en busca de utilidades que este repo todavía no tenía, y se portaron una por una (evitando duplicar nombres ya existentes) en vez de reemplazar archivos completos.
+
+### 🔧 Segunda pasada de mantenimiento (esta actualización)
+- **`messages-send.js`** — se corrigió un caso donde el nodo `biz` (usado por los botones nativos) podía duplicarse dentro del stanza si ya venía agregado por otra parte del mensaje; ahora se verifica que no exista antes de agregarlo.
+- Se documentaron en este README funciones que **ya existían en el código** desde la fusión con el fork beta pero no tenían ejemplo de uso: tablas, bloques de código, carruseles, álbumes y canales/newsletters (ver secciones nuevas más abajo).
+
+### 🔧 Tercera pasada de mantenimiento — auditoría completa de código (no solo README)
+- Se comparó **archivo por archivo** todo `lib/` entre este fork y el fork beta (no solo lo que aparecía documentado). Confirmado: no faltaba ninguna función real, solo faltaban exports y tipos.
+- Fix: `Utils/reporting-utils.js` existía en el código pero **no se exportaba** desde el paquete (`Utils/index.js` / `Utils/index.d.ts`) — quien instalaba `@fer2809fl/baileys` no podía importar sus funciones. Ya se agregó.
+- Fix: `Utils/companion-reg-client-utils.js` tampoco se exportaba en `Utils/index.d.ts` (sí en el `.js`) — corregido.
+- **Tipos de TypeScript nuevos**: se escribieron los `.d.ts` que faltaban para los 9 módulos portados del beta que solo venían en JavaScript — `anti-ban`, `smart-reconnect`, `message-queue`, `enhanced-cache`, `enhanced-logger`, `bot-utils`, `banner`, `rich-message-utils` y `use-sqlite-auth-state` — verificados con `tsc` para que compilen sin errores. Ahora sí tienen autocompletado y chequeo de tipos en TypeScript.
+- Limpieza de marca: `banner.js` y `enhanced-logger.js` traían branding y un link de repo del proyecto original de donde se portó el código; se actualizó a este fork.
+
+Próximas tandas (se irán agregando poco a poco): documentación de Grupos avanzados, Comunidades, Negocios, Perfil/Privacidad, Estados (stories) y Eventos.
+
+### 🆕 Cuarta pasada — actualización de protocolo + funciones nuevas
+- **Versión de WhatsApp Web actualizada** a `2.3000.1047406223` (la más reciente confirmada al momento de esta actualización), reduciendo el riesgo de rechazo de conexión por versión vieja.
+- **Nuevas funciones de chat** (no existían ni en este fork ni en el beta — son de cosecha propia esta vez): atajos simples para las operaciones de chat más comunes, en vez de tener que armar el objeto de `chatModify` a mano:
+  ```javascript
+  await sock.pinChat(jid)              // fijar chat
+  await sock.pinChat(jid, false)       // desfijar
+  await sock.archiveChat(jid)          // archivar
+  await sock.archiveChat(jid, false)   // desarchivar
+  await sock.muteChat(jid, Date.now() + 8 * 60 * 60 * 1000) // silenciar 8 horas
+  await sock.muteChat(jid)             // quitar silencio
+  await sock.markChatRead(jid)         // marcar como leído
+  await sock.markChatUnread(jid)       // marcar como no leído
+  await sock.clearChat(jid)            // vaciar el historial del chat
+  await sock.deleteChat(jid)           // eliminar el chat de la lista
+  ```
+  Todas usan por debajo el mismo `chatModify` de siempre (mismo protocolo, mismos parches de estado), solo que ahora no hay que recordar la forma exacta del objeto `mod`.
+- **Fijar un mensaje dentro del chat** (`pinInChatMessage`) — esta ya existía en el código pero no estaba documentada:
+  ```javascript
+  // Fijar el mensaje citado por 24 horas (86400 segundos)
+  await sock.sendMessage(jid, { pin: quotedMsg.key, type: 1, time: 86400 })
+  // Desfijar
+  await sock.sendMessage(jid, { pin: quotedMsg.key, type: 2 })
+  ```
+
+### ✅ Nuevas funciones añadidas
+
+**Anti-Ban** (`Utils/anti-ban.js`)
+- `randomDelay`, `messageDelay`, `typingDelay` — retrasos aleatorios "humanizados" antes de enviar.
+- `RateLimiter`, `globalRateLimiter`, `groupRateLimiter`, `broadcastRateLimiter` — limitadores de tasa listos para usar por chat/grupo/difusión.
+- `PresenceManager`, `generateSessionFingerprint`, `isValidJid`, `sanitizeMessage` — utilidades de apoyo para reducir el riesgo de baneo por comportamiento de bot.
+
+**Reconexión inteligente** (`Utils/smart-reconnect.js`)
+- `SmartReconnect`, `createConnectionHandler`, `withRetry` — backoff exponencial con jitter y detección de causas de desconexión recuperables vs definitivas.
+
+**Cola de mensajes** (`Utils/message-queue.js`)
+- `MessageQueue`, `createMessageQueue` — colas con prioridad (`PRIORITY.CRITICAL` a `PRIORITY.BACKGROUND`) y control de tasa por tipo de contenido.
+
+**Caché mejorada** (`Utils/enhanced-cache.js`)
+- `EnhancedCache`, `CacheManager` — caché en memoria con TTL/stale-TTL basada en `lru-cache`, con snapshot a disco.
+
+**Logger mejorado** (`Utils/enhanced-logger.js`)
+- `createLogger`, `RyzeLogger` — logger con niveles, colores en consola e iconos por categoría (no reemplaza tu logger `pino` existente, es una alternativa opcional).
+
+**Mensajes programados** (`Utils/scheduled-messages.js`)
+```javascript
+import { startScheduler, scheduleMessage, recurringMessage } from '@fer2809fl/baileys'
+
+startScheduler(sock) // arranca el scheduler una vez tengas el sock conectado
+
+// una sola vez, en una fecha exacta
+scheduleMessage('123@s.whatsapp.net', { text: 'Recordatorio' }, Date.now() + 60_000)
+
+// recurrente con cron simple: "MIN HOUR DOM MON DOW"
+recurringMessage('123@s.whatsapp.net', { text: 'Buenos días' }, '0 9 * * *')
+```
+También: `cancelScheduledMessage`, `deleteScheduledMessage`, `listScheduledMessages`, `getScheduledMessage`, `updateScheduledMessage`, `getSchedulerStats`. Persiste en `database/scheduled-messages.json`.
+
+**Utilidades de LID** (`Utils/lid-utils.js`)
+- `isLid`, `lidToJid`, `resolveAnyLidToJid`, `resolveParticipant`, `getParticipantJid(s)`, `cacheParticipantLids`, `findParticipantByNumber`, entre otras — resolución y cacheo de `@lid` ↔ número real con persistencia en `database/lid-cache.json`. Complementa (no reemplaza) la resolución de admins/JID-LID nativa que ya tenía este fork desde v1.10.0.
+
+**Utilidades para bots** (`Utils/bot-utils.js`)
+- `parseCommand(text, prefix)` — parseo de comandos con flags (`--flag=valor`) y argumentos.
+- `CooldownManager`, `PermissionManager` (owners/admins/baneados/premium).
+- `extractMentions`, `extractQuotedMessage`, `isGroupAdmin`, `isBotAdmin`, `formatPhoneNumber`, `parseTime('10m')`, `formatDuration(ms)`, `sendFast(sock, jid, contenido)`.
+
+**Auth state en SQLite** (`Utils/use-sqlite-auth-state.js`)
+```javascript
+import { useSqliteAuthState } from '@fer2809fl/baileys'
+const { state, saveCreds } = await useSqliteAuthState({ dbPath: './auth.db' })
+```
+Requiere `better-sqlite3` (peer dependency opcional: `npm i better-sqlite3`).
+
+**Banner de inicio** (`Utils/banner.js`) — `printBanner()` opcional para mostrar un logo ASCII al arrancar el bot.
+
+**AI Rich Response — helpers de bajo nivel** (`Utils/rich-message-utils.js`)
+- `prepareRichResponseMessage(contenido)` — arma un `AIRichResponseMessage` completo (texto + código + tabla + links) en un solo llamado, incluyendo la firma/certificado de `botMetadata`.
+- `toUnified`, `wrapToBotForwardedMessage`, `botMetadataSignature`, `botMetadataCertificate` — piezas internas reutilizables si armas tus propios mensajes enriquecidos.
+- Se ampliaron los lenguajes soportados para resaltado de código en `LANGUAGE_KEYWORDS` (`Utils/rich-messages.js`): ahora incluye `rust`, `c`, `cpp`/`c++`, `csharp`/`c#`, `html` y `css`, además de los que ya tenías.
+
+**Builder "Modded"** (`Modded/message_builder.js`) — clases con API encadenable para armar botones, carruseles y respuestas AI-Rich sin construir el objeto a mano: `Button`, `ButtonV2`, `Carousel`, `AIRich`, `ORich`, `Toolkit`. *(Este archivo trae una nota de autoría de su creador original — se mantuvo intacta tal cual, junto con los términos: uso libre para proyectos propios, pero no puede revenderse ni redistribuirse como librería independiente.)*
+
+**VoIP — llamadas de voz** (`VoIP/`) — cliente experimental de llamadas de voz de WhatsApp sobre el motor WASM oficial:
+```javascript
+import { VoipClient, CallState } from '@fer2809fl/baileys'
+
+const voip = new VoipClient(sock)
+const call = await voip.call('123@s.whatsapp.net')
+call.on('stateChange', (state) => console.log(CallState[state]))
+```
+Incluye `ActiveCall`, manejo de señalización, y el binario WASM necesario (`lib/assets/wasm/`). Es una función pesada y experimental: úsala solo si tu bot realmente necesita hacer/recibir llamadas.
+
+### 🔧 Notas de mantenimiento
+- Se revisó cuidadosamente cada función nueva contra el código ya existente para no pisar ni duplicar exports (por ejemplo, `BufferJSON` y los tipos de resaltado de código se reutilizan de los archivos que ya tenías, en vez de crear una segunda copia).
+- Las funciones marcadas arriba con ejemplo de código ya están 100% cableadas y listas para usar; el resto se documentará con más ejemplos en la próxima revisión.
+- Los archivos `anti-ban.js`, `smart-reconnect.js`, `message-queue.js`, `enhanced-cache.js`, `enhanced-logger.js`, `bot-utils.js`, `banner.js`, `rich-message-utils.js` y `use-sqlite-auth-state.js` se distribuyen por ahora solo en JavaScript (igual que en el fork de origen); los tipos de TypeScript para estos módulos llegarán en una futura actualización.
+
+---
+
 ## 🆕 Novedades — v7.0.4
 
 Actualización de estabilidad y sincronización con las últimas mejoras del protocolo de WhatsApp Web.
@@ -522,6 +637,140 @@ Ver **`examples/html-dynamic/`** para un demo completo y funcional con SQLite.
   o privados, no en broadcast.
 - Probá siempre en Android, iOS y WhatsApp Web — los tres WebViews tienen
   comportamientos distintos.
+
+---
+
+## 📊 Mensajes Enriquecidos (Tablas, Código, Links, LaTeX)
+
+Estas funciones ya vienen integradas en el fork (heredadas de la fusión con el fork beta) — aquí quedan documentadas con ejemplos reales.
+
+```javascript
+// Tabla (formato clásico)
+await sock.sendTable(
+  jid,
+  'Precios',
+  ['Producto', 'Precio'],
+  [['Plan A', '$10'], ['Plan B', '$20']],
+  quotedMsg,
+  { headerText: 'Nuestros planes', footer: 'Precios en USD' }
+)
+
+// Tabla V2 (respuesta unificada tipo "AI Rich")
+await sock.sendTableV2(jid, tablaObjeto, quotedMsg, { title: 'Precios' })
+
+// Lista simple
+await sock.sendList(jid, 'Tareas', ['Comprar pan', 'Pagar luz'], quotedMsg)
+
+// Bloque de código
+await sock.sendCodeBlock(jid, 'console.log("hola")', quotedMsg, {
+  language: 'javascript',
+  title: 'Ejemplo'
+})
+
+// Bloque de código V2 (unified response)
+await sock.sendCodeBlockV2(jid, 'SELECT * FROM users;', quotedMsg, { language: 'sql' })
+
+// Texto con links enriquecidos (embeds inline)
+await sock.sendLink(jid, 'Mira esto: ', [
+  { url: 'https://github.com/Fer2809fl/Bail', displayName: 'Repo en GitHub' }
+], quotedMsg)
+
+// LaTeX (fórmulas)
+await sock.sendLatex(quotedMsg, { formula: 'E = mc^2' })
+```
+
+## 🎠 Carruseles y 🖼️ Álbumes
+
+**Carrusel** — se envía como un `interactiveMessage` con `carouselMessage`, cada tarjeta puede llevar imagen/video y sus propios botones nativos:
+
+```javascript
+await sock.sendMessage(jid, {
+  interactiveMessage: {
+    body: { text: 'Elegí un producto' },
+    footer: { text: 'Catálogo 2026' },
+    carouselMessage: {
+      cards: [
+        {
+          header: { title: 'Producto 1', imageMessage: 'https://.../foto1.jpg' },
+          body: { text: 'Descripción del producto 1' },
+          nativeFlowMessage: { buttons: [/* botones nativos, ver sección de Botones */] }
+        },
+        {
+          header: { title: 'Producto 2', videoMessage: 'https://.../video2.mp4' },
+          body: { text: 'Descripción del producto 2' }
+        }
+      ]
+    }
+  }
+})
+```
+
+**Álbum** — varias imágenes/videos agrupados en un mismo "paquete" visual (como el álbum nativo de WhatsApp):
+
+```javascript
+await sock.sendMessage(jid, {
+  album: [
+    { image: { url: './foto1.jpg' }, caption: 'Foto 1' },
+    { image: { url: './foto2.jpg' } },
+    { video: { url: './video1.mp4' } }
+  ]
+})
+```
+
+> Ambas funciones viven en `Socket/dugong.js` (el despachador interno que detecta el tipo de contenido especial que le mandás a `sock.sendMessage`) y ya estaban portadas desde la fusión con el fork beta — lo que faltaba era este ejemplo en el README.
+
+---
+
+## 📰 Newsletters / Canales
+
+Todo el manejo de canales (newsletters) de WhatsApp ya está integrado en `Socket/newsletter.js`. Resumen de las funciones disponibles en `sock`:
+
+```javascript
+// Crear un canal
+const canal = await sock.newsletterCreate('Mi Canal', 'Descripción del canal')
+
+// Seguir / dejar de seguir / silenciar / activar notificaciones
+await sock.newsletterAction(jid, 'follow')     // seguir
+await sock.newsletterAction(jid, 'unfollow')   // dejar de seguir
+await sock.newsletterAction(jid, 'mute')       // silenciar
+await sock.newsletterAction(jid, 'unmute')     // reactivar notificaciones
+
+// Seguir varios canales de una (separados por espacio en un solo string)
+await sock.newsletterMultipleFollow('120363...@newsletter 120363...@newsletter')
+
+// Ver todos los canales a los que estás suscrito
+const misCanales = await sock.newsletterFetchAllSubscribe()
+
+// Obtener metadata de un canal por su JID o por su código de invitación
+const meta = await sock.newsletterMetadata('invite', 'codigoDeInvitacion')
+// o, a partir de un link https://whatsapp.com/channel/xxxx o wa.me/channel/xxxx:
+const metaPorLink = await sock.cekIDSaluran('https://whatsapp.com/channel/xxxxxxxx')
+
+// Editar (nombre, descripción, foto)
+await sock.newsletterUpdateName(jid, 'Nuevo nombre')
+await sock.newsletterUpdateDescription(jid, 'Nueva descripción')
+await sock.newsletterUpdatePicture(jid, fotoBuffer)
+await sock.newsletterRemovePicture(jid)
+
+// Administración
+await sock.newsletterSubscribers(jid)          // cantidad/lista de suscriptores
+await sock.newsletterAdminCount(jid)           // cantidad de admins
+await sock.newsletterChangeOwner(jid, nuevoOwnerJid)
+await sock.newsletterDemote(jid, userJid)
+await sock.newsletterDelete(jid)
+
+// Mensajes del canal
+await sock.newsletterFetchMessages(jid, 20)    // últimos 20 mensajes
+await sock.newsletterReactMessage(jid, serverId, '❤️')
+```
+
+**Enviar un mensaje a un canal** es igual que a cualquier chat, usando el JID del canal (termina en `@newsletter`):
+
+```javascript
+await sock.sendMessage(canalJid, { text: 'Novedades de hoy 🎉' })
+```
+
+> Nota de mantenimiento (heredada de v7.0.4): WhatsApp movió los endpoints internos de `follow`/`unfollow` a una versión `_v2`; este fork ya usa los IDs de consulta vigentes, así que el seguimiento de canales no debería fallar por IDs vencidos.
 
 ---
 
