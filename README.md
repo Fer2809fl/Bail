@@ -157,7 +157,7 @@ yarn add github:Fer2809fl/Baileys
 ```json
 {
   "dependencies": {
-    "@fer2809fl/baileys": "^1.11.0"
+    "@fer2809fl/baileys": "^7.0.5"
   }
 }
 ```
