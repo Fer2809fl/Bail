@@ -76,6 +76,20 @@ export declare const makeChatsSocket: (config: SocketConfig) => {
         id: string;
         fromMe?: boolean;
     }[], star: boolean) => Promise<void>;
+    /** Fija o desfija un chat en la parte superior de la lista de chats. */
+    pinChat: (jid: string, pin?: boolean) => Promise<void>;
+    /** Archiva o desarchiva un chat. */
+    archiveChat: (jid: string, archive?: boolean, lastMessages?: import("../Types/index.js").LastMessageList) => Promise<void>;
+    /** Silencia un chat hasta `muteEndTimestamp` (ms). Pasa `undefined` para quitar el silencio. */
+    muteChat: (jid: string, muteEndTimestamp?: number) => Promise<void>;
+    /** Marca un chat como leído (o no leído con `read: false`). */
+    markChatRead: (jid: string, read?: boolean, lastMessages?: import("../Types/index.js").LastMessageList) => Promise<void>;
+    /** Atajo para marcar un chat como no leído. */
+    markChatUnread: (jid: string, lastMessages?: import("../Types/index.js").LastMessageList) => Promise<void>;
+    /** Vacía el historial de un chat sin eliminar el chat. */
+    clearChat: (jid: string, lastMessages?: import("../Types/index.js").LastMessageList) => Promise<void>;
+    /** Elimina un chat completo de la lista de chats. */
+    deleteChat: (jid: string, lastMessages?: import("../Types/index.js").LastMessageList) => Promise<void>;
     addOrEditQuickReply: (quickReply: QuickReplyAction) => Promise<void>;
     removeQuickReply: (timestamp: string) => Promise<void>;
     type: "md";
