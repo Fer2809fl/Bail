@@ -18,22 +18,21 @@
 
 ## 🆕 Novedades — v7.0.5
 
-Tanda de mantenimiento: se revisó el fork "beta" del proyecto en busca de utilidades que este repo todavía no tenía, y se portaron una por una (evitando duplicar nombres ya existentes) en vez de reemplazar archivos completos.
+**La actualización más completa hasta ahora.** Se revisó el fork "beta" del proyecto en busca de utilidades que este repo todavía no tenía, se portaron una por una (evitando duplicar nombres ya existentes) y se hizo una auditoría de código de punta a punta — no solo del README.
 
-### 🔧 Segunda pasada de mantenimiento (esta actualización)
+### 🔧 Mantenimiento y correcciones
 - **`messages-send.js`** — se corrigió un caso donde el nodo `biz` (usado por los botones nativos) podía duplicarse dentro del stanza si ya venía agregado por otra parte del mensaje; ahora se verifica que no exista antes de agregarlo.
-- Se documentaron en este README funciones que **ya existían en el código** desde la fusión con el fork beta pero no tenían ejemplo de uso: tablas, bloques de código, carruseles, álbumes y canales/newsletters (ver secciones nuevas más abajo).
+- **Auditoría completa de `lib/`**, archivo por archivo contra el fork beta: no faltaba ninguna función real, solo faltaban algunos exports y tipos, ya corregidos.
+- **Exports arreglados** — `Utils/reporting-utils.js` y `Utils/companion-reg-client-utils.js` existían en el código pero no se exportaban bien desde el paquete; quien instalaba `@fer2809fl/baileys` no podía importar sus funciones. Ya se puede.
+- **Tipos de TypeScript agregados** para los 9 módulos que solo venían en JavaScript — `anti-ban`, `smart-reconnect`, `message-queue`, `enhanced-cache`, `enhanced-logger`, `bot-utils`, `banner`, `rich-message-utils` y `use-sqlite-auth-state` — verificados con `tsc`. Ahora tienen autocompletado y chequeo de tipos.
+- **Limpieza de marca** en `banner.js` y `enhanced-logger.js` (traían branding del proyecto original de donde se portó el código).
+- En general: se optimizó y se prolijaron varios detalles sueltos de código y documentación que quedaron de fusiones anteriores.
 
-### 🔧 Tercera pasada de mantenimiento — auditoría completa de código (no solo README)
-- Se comparó **archivo por archivo** todo `lib/` entre este fork y el fork beta (no solo lo que aparecía documentado). Confirmado: no faltaba ninguna función real, solo faltaban exports y tipos.
-- Fix: `Utils/reporting-utils.js` existía en el código pero **no se exportaba** desde el paquete (`Utils/index.js` / `Utils/index.d.ts`) — quien instalaba `@fer2809fl/baileys` no podía importar sus funciones. Ya se agregó.
-- Fix: `Utils/companion-reg-client-utils.js` tampoco se exportaba en `Utils/index.d.ts` (sí en el `.js`) — corregido.
-- **Tipos de TypeScript nuevos**: se escribieron los `.d.ts` que faltaban para los 9 módulos portados del beta que solo venían en JavaScript — `anti-ban`, `smart-reconnect`, `message-queue`, `enhanced-cache`, `enhanced-logger`, `bot-utils`, `banner`, `rich-message-utils` y `use-sqlite-auth-state` — verificados con `tsc` para que compilen sin errores. Ahora sí tienen autocompletado y chequeo de tipos en TypeScript.
-- Limpieza de marca: `banner.js` y `enhanced-logger.js` traían branding y un link de repo del proyecto original de donde se portó el código; se actualizó a este fork.
+Se documentaron además funciones que ya existían en el código pero no tenían ejemplo de uso: tablas, bloques de código, carruseles, álbumes y canales/newsletters (ver secciones nuevas más abajo).
 
 Próximas tandas (se irán agregando poco a poco): documentación de Grupos avanzados, Comunidades, Negocios, Perfil/Privacidad, Estados (stories) y Eventos.
 
-### 🆕 Cuarta pasada — actualización de protocolo + funciones nuevas
+### 🆕 Protocolo actualizado + funciones nuevas de chat
 - **Versión de WhatsApp Web actualizada** a `2.3000.1047406223` (la más reciente confirmada al momento de esta actualización), reduciendo el riesgo de rechazo de conexión por versión vieja.
 - **Nuevas funciones de chat** (no existían ni en este fork ni en el beta — son de cosecha propia esta vez): atajos simples para las operaciones de chat más comunes, en vez de tener que armar el objeto de `chatModify` a mano:
   ```javascript
@@ -124,75 +123,10 @@ call.on('stateChange', (state) => console.log(CallState[state]))
 ```
 Incluye `ActiveCall`, manejo de señalización, y el binario WASM necesario (`lib/assets/wasm/`). Es una función pesada y experimental: úsala solo si tu bot realmente necesita hacer/recibir llamadas.
 
-### 🔧 Notas de mantenimiento
+### 📌 Notas finales
 - Se revisó cuidadosamente cada función nueva contra el código ya existente para no pisar ni duplicar exports (por ejemplo, `BufferJSON` y los tipos de resaltado de código se reutilizan de los archivos que ya tenías, en vez de crear una segunda copia).
 - Las funciones marcadas arriba con ejemplo de código ya están 100% cableadas y listas para usar; el resto se documentará con más ejemplos en la próxima revisión.
 - Los archivos `anti-ban.js`, `smart-reconnect.js`, `message-queue.js`, `enhanced-cache.js`, `enhanced-logger.js`, `bot-utils.js`, `banner.js`, `rich-message-utils.js` y `use-sqlite-auth-state.js` se distribuyen por ahora solo en JavaScript (igual que en el fork de origen); los tipos de TypeScript para estos módulos llegarán en una futura actualización.
-
----
-
-## 🆕 Novedades — v7.0.4
-
-Actualización de estabilidad y sincronización con las últimas mejoras del protocolo de WhatsApp Web.
-
-### ✅ Nuevas funciones añadidas
-- **`withUsernameProtocol()`** en `USyncQuery` — permite sincronizar contactos por *username* de WhatsApp (la nueva forma de identificar cuentas, además del número de teléfono):
-  ```javascript
-  const result = await sock.executeUSyncQuery(
-    new USyncQuery().withUsernameProtocol().withUser(new USyncUser().withPhone('+123...'))
-  )
-  ```
-- **`sock.fetchAccountReachoutTimelock()`** — consulta si tu cuenta tiene alguna restricción activa para iniciar chats nuevos, y hasta cuándo dura.
-- **`sock.fetchNewChatMessageCap()`** — consulta el límite de mensajes que puedes enviar a chats/números nuevos (cupo anti-spam de WhatsApp).
-- **`sock.registerSocketEndHandler(handler)`** — registra una función que se ejecuta automáticamente cada vez que la conexión se cierra (útil para limpieza de recursos propios sin tener que escuchar `connection.update` a mano).
-- **Nuevo formato de código QR de emparejamiento** — el QR ahora incluye el identificador de plataforma del companion, igual que el WhatsApp Web oficial (mejora la tasa de éxito al vincular).
-
-### 🐛 Correcciones de estabilidad y memoria
-- **Fuga de memoria en el buffer de eventos** — se agregó limpieza real de timers, cachés y listeners al cerrar una conexión (`ev.destroy()`), evitando que la memoria crezca con reconexiones frecuentes.
-- **Loop de reintentos por fallas de descifrado (MAC)** — se agregó detección de colisión de "base key" en reintentos de mensajes: si WhatsApp reenvía el mismo mensaje repetidamente por un fallo de sesión, la librería ahora detecta el patrón y fuerza una sesión nueva en vez de reintentar indefinidamente.
-- **Duplicados al sincronizar historial de grupos** — se corrigió el merge de "participantes que salieron" (`pastParticipants`) para no duplicar entradas cuando WhatsApp envía el historial en varios paquetes.
-- **IDs de consulta de canales (newsletters) desactualizados** — los IDs internos de `FOLLOW`/`UNFOLLOW` de canales estaban vencidos y podían empezar a fallar silenciosamente; se actualizaron a los vigentes.
-- **Versión de protocolo de WhatsApp Web actualizada** — reduce el riesgo de desconexiones forzadas por versión obsoleta.
-- **Dependencias actualizadas**: `libsignal` ahora se instala desde npm (antes requería `git` instalado en el servidor), `whatsapp-rust-bridge`, `protobufjs` y otras al día.
-
-> Nota: las funciones de auto-follow de canales, el motor de envío de mensajes (`sendMessage` y helpers internos) y el manejo avanzado de negocios (`business.js`) son personalizaciones propias de este fork — se mantuvieron intactas durante esta actualización.
-
-### 🔧 Fusión profunda adicional
-- **`chats.js` reconstruido sobre la base oficial**: recuperación automática de sincronización de estado cuando falta una clave (antes fallaba silenciosamente), resolución correcta de bloqueo de contactos por LID/PN, y tracking de finalización de sincronización de historial.
-- **`groups.js` reconstruido**: mejor resolución de LID/PN en metadata de grupos + tus funciones `isGroupAdmin`, `getGroupAdmins`, `resolveParticipantJid`, `groupMetadataCached` intactas.
-- **`business.js` alineado al oficial** (era funcionalmente idéntico, solo cambiaba el estilo del código).
-- **Endpoint de canales actualizado**: WhatsApp movió `newsletterFollow`/`newsletterUnfollow` a un endpoint nuevo (`_v2`); se actualizó, incluyendo tu sistema de auto-follow interno, para que siga funcionando.
-
----
-
-
-
-### ✅ Nuevas funciones añadidas
-- **Detección de admins y resolución de JID/LID 100% nativa** — Antes, cada bot tenía que reimplementar a mano la comparación de `jid`, `@lid` y número de teléfono contra `groupMetadata` para saber si alguien es admin. Ahora esa lógica vive directamente en el socket:
-  - `isGroupAdmin(chatId, jid)` — `true`/`false` si ese participante (venga como número o como `@lid`) es admin o superadmin del grupo.
-  - `getGroupAdmins(chatId)` — lista de admins del grupo, ya resueltos a su jid de número de teléfono real (nunca `@lid`).
-  - `resolveParticipantJid(chatIdOrParticipants, jid)` — convierte cualquier `@lid` a su número real. Primero busca en los participantes del grupo; si no encuentra coincidencia, usa el mapeo LID↔PN nativo de WhatsApp (`signalRepository.lidMapping`) en vez de adivinar.
-  - `groupMetadataCached(chatId)` — igual que `groupMetadata`, pero con cache de 30s que se invalida solo apenas hay un alta, baja, ascenso o descenso real de participantes (via `group-participants.update`), para no golpear a WhatsApp en cada mensaje.
-
-  Esto es lo mismo que antes hacían los bots "a mano" con `groupMetadata` + comparaciones manuales de `id`/`lid`/`phoneNumber`, pero ahora resuelto por la librería, con cache y con el mapeo oficial de WhatsApp como respaldo.
-
----
-
-## 🆕 Novedades — v7.0.1
-
-### ✅ Nuevas funciones añadidas
-- **Botones nativos reales** — Se agregaron métodos directos en el socket para enviar botones interactivos de WhatsApp (native flow), reemplazando el viejo formato `buttons: [{text, id}]` que ya no renderiza en WhatsApp:
-  - `sendQuickReplyButtons` — Botones de respuesta rápida
-  - `sendUrlButton` — Botón que abre un enlace
-  - `sendCallButton` — Botón para iniciar una llamada
-  - `sendCopyButton` — Botón que copia texto al portapapeles
-  - `sendReminderButton` — Botón de recordatorio
-  - `sendListButton` — Menú desplegable con secciones y filas
-  - `sendMixedButtons` — Combinación libre de varios tipos en un solo mensaje
-- **Previsualización automática de links** — `sendLinkPreview` y todos los botones de arriba arman solos la tarjeta grande (imagen + título + descripción) de cualquier URL que detecten en el texto, con el mismo motor que usa WhatsApp para los links normales.
-
-### 🐛 Correcciones
-- **Error en macOS** — Se reparó un bug crítico que impedía iniciar sesión correctamente en dispositivos Mac. El proceso de pairing/QR ahora funciona de forma estable en macOS.
 
 ---
 
