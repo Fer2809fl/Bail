@@ -60,6 +60,7 @@ export declare class WasmEngine {
     }) => unknown;
     endCall: (reason?: number, sendTerminate?: boolean) => void;
     setMute: (muted: boolean) => number;
+    acceptCall: (withAudio?: boolean, withVideo?: boolean) => unknown;
     updateNetworkMedium: (networkMedium: number, networkMtu?: number) => void;
     handleSignalingOffer: (msg: {
         payload: string;
