@@ -16,6 +16,22 @@
 
 ---
 
+## 🆕 Novedades — v7.0.7
+
+**Botones con acción más seguros y más robustos.** La versión se mantiene en 7.0.7; esto es lo que cambió dentro de `lib/Socket/native-buttons.js`:
+
+- 🔒 **Solo el dueño cancela su recordatorio.** Antes cualquiera en un grupo podía tocar "Cancelar recordatorio" de otra persona.
+- 🛡️ **Anti-spam:** cooldown de 1,5 s por usuario y botón (si lo machacan, solo cuenta el primer toque) y **máximo 20 recordatorios pendientes por usuario**.
+- 💬 **Avisos claros:** botón expirado → "⌛ Este botón ya expiró"; botón `actionOnce` ya gastado → "✅ Este botón ya se usó".
+- 💾 **Persistencia segura:** los JSON de `database/` se escriben de forma atómica y se guardan al cerrar el proceso, así no se corrompen.
+- ✅ **Validación al enviar:** URL, teléfono, listas, botones vacíos e ids repetidos fallan con un error claro en español.
+- 🧾 `listReminders()` devuelve copias ordenadas por fecha.
+- 🧩 Un solo comando de ejemplo, [`examples/Ibtn.ts`](examples/Ibtn.ts), con 3 modos: `ibtn` (acciones), `ibtn native` y `ibtn recordatorios` (ver y cancelar tus recordatorios).
+
+Detalle completo en el [CHANGELOG](CHANGELOG.md).
+
+---
+
 ## 🆕 Novedades — v7.0.5
 
 **La actualización más completa hasta ahora.** Se revisó el fork "beta" del proyecto en busca de utilidades que este repo todavía no tenía, se portaron una por una (evitando duplicar nombres ya existentes) y se hizo una auditoría de código de punta a punta — no solo del README.
@@ -318,6 +334,123 @@ await fer.sendMixedButtons(
 
 ---
 
+## ⚡ Botones con Acción *(Actualización 7.0.7)*
+
+Estos botones **responden solos**: el socket escucha el toque del usuario y ejecuta la acción. No tienes que armar ningún `messages.upsert` a mano. Las acciones se guardan en `database/native-button-actions.json`, así que siguen funcionando aunque el bot se reinicie o reconecte.
+
+Opciones extra (van dentro de `extra`): `actionTtl` (vida del botón, por defecto `"7d"`) y `actionOnce: true` (el botón solo funciona una vez).
+
+### 📊 `sendPollButton` — Abre una encuesta personalizada
+
+```javascript
+await fer.sendPollButton(
+    jid,
+    '🗳️ *OPINIÓN*\n\n¿Quieres votar?',
+    '📊 Abrir encuesta',
+    {
+        name: '¿Qué te parece el bot?',          // pregunta
+        values: ['🔥 Genial', '👍 Bien', '😐 Regular', '👎 Mejorable'],  // 2 a 12 opciones
+        selectableCount: 1                        // 1 = una respuesta, 0 = sin límite
+    }
+)
+```
+
+### 📍 `sendLocationButton` — Envía una ubicación al tocar
+
+```javascript
+await fer.sendLocationButton(
+    jid,
+    '📍 *UBICACIÓN*\n\n¿Dónde estamos?',
+    '📍 Ver ubicación',
+    { latitude: 4.5981, longitude: -74.0760, name: 'Mi local', address: 'Calle 1 #2-3' }
+)
+```
+
+### ⏰ `sendReminderMenu` — Recordatorio con tiempo a elegir
+
+Lista desplegable: el usuario elige cuándo quiere el aviso y el bot lo programa. Al llegar la hora menciona al usuario en el mismo chat. Tras elegir, el bot confirma y ofrece un botón **Cancelar recordatorio**.
+
+```javascript
+await fer.sendReminderMenu(
+    jid,
+    '⏰ *RECORDATORIO*\n\n¿Cuándo te aviso?',
+    '⏰ Recordarme',
+    'Reunión con el equipo',                     // lo que se le recordará
+    // opcional: tus propias opciones (por defecto: 10 min, 30 min, 1 h, 3 h, 1 día, 1 semana)
+    { rows: [{ title: 'En 5 minutos', in: '5m' }, { title: 'Mañana', in: '1d' }] }
+)
+```
+
+Un solo botón con tiempo fijo:
+
+```javascript
+await fer.sendReminderActionButton(jid, 'Toma agua 💧', '⏰ Recordarme en 1 h',
+    { text: 'Tomar agua', in: '1h' })      // in: "10m", "1h30m", "2d" — o at: new Date('2026-12-31T09:00:00')
+```
+
+Los recordatorios se guardan en `database/native-reminders.json` y se re-programan al reiniciar. `fer.listReminders(jid?)` y `fer.cancelReminder(id)` los administran desde código.
+
+### 🧩 `sendActionButtons` — Varias acciones en un mismo mensaje
+
+```javascript
+await fer.sendActionButtons(jid, '🎛️ *PANEL*', [
+    { text: '📍 Ubicación', action: { type: 'location', location: { latitude: 4.6, longitude: -74.07 } } },
+    { text: '📊 Encuesta',  action: { type: 'poll', poll: { name: '¿Pizza?', values: ['Sí', 'No'] } } },
+    { text: '💬 Saludar',   action: { type: 'text', text: '¡Hola! 👋' } },
+    { text: '⚙️ Mi función', action: async ({ sock, chat, user, response }) => {
+        await sock.sendMessage(chat, { text: `Tocaste: ${response.text}` })
+    } }
+])
+```
+
+`action` también puede ser `{ type: 'reminder', text, in }`. Para botones que ya mandas con `sendQuickReplyButtons`, registra tu handler con `fer.onButton('menu', ({ chat, user }) => { ... })`.
+
+### 🛡️ Reglas de uso de los botones con acción
+
+- **Cooldown:** mismo usuario + mismo botón = 1 toque cada 1,5 s.
+- **Recordatorios:** máximo 20 pendientes por usuario; solo su dueño puede cancelarlos.
+- **Expiración / un solo uso:** si el botón ya expiró (`actionTtl`) o ya se gastó (`actionOnce`), el bot avisa en vez de quedarse callado.
+- **Cancelar desde código:** `{ type: 'cancel_reminder', reminderId }` se puede usar como `action` y es persistente (ver `ibtn recordatorios` en `examples/Ibtn.ts`).
+
+### 🔎 `parseButtonResponse` — Leer cualquier respuesta de botón
+
+```javascript
+const r = fer.parseButtonResponse(m)   // { kind, id, text, name?, params? } o null
+```
+
+Cubre `quick_reply`, listas, `buttonsMessage` y `templateButtons`.
+
+---
+
+## 🧱 Botones Native Flow "crudos" *(Actualización 7.0.7)*
+
+Los dibuja el cliente de WhatsApp. **Varios dependen de la cuenta o de la versión de WhatsApp** (catálogo, pagos, mpm, recordatorio nativo): si la cuenta no es Business, el cliente puede ignorarlos o mostrarlos sin función. Para algo que funcione siempre usa los botones con acción de arriba.
+
+| Método | Botón nativo |
+|---|---|
+| `sendRequestLocationButton(jid, text, buttonText?)` | `send_location` |
+| `sendReminderButton(jid, text, buttonText)` | `cta_reminder` |
+| `sendCancelReminderButton(jid, text, buttonText?)` | `cta_cancel_reminder` |
+| `sendAddressButton(jid, text, buttonText?)` | `address_message` |
+| `sendWebviewButton(jid, text, title, url)` | `open_webview` |
+| `sendCatalogButton(jid, text, businessPhone)` | `cta_catalog` |
+| `sendProductListButton(jid, text, productId)` | `mpm` |
+| `sendPaymentDetailsButton(jid, text, transactionId)` | `wa_payment_transaction_details` |
+| `sendViewCatalogButton(jid, text, businessPhone, productId)` | `automated_greeting_message_view_catalog` |
+| `sendNativeFlowButtons(jid, text, buttons)` | cualquiera: `[{ name, params }]` |
+
+```javascript
+await fer.sendNativeFlowButtons(jid, '🧪 Botones Test', [
+    { name: 'cta_copy', params: { display_text: 'copy', copy_code: 'Nose' } },
+    { name: 'cta_url',  params: { display_text: 'Vercel', url: 'https://vercel.com', merchant_url: 'https://vercel.com' } },
+    { name: 'send_location', params: { display_text: '📍 Enviar ubicación' } }
+])
+```
+
+Los botones especiales que van **solos** en el mensaje (`send_location`, `cta_catalog`, `mpm`, pagos, catálogo) ahora llevan su propio `native_flow name` en el nodo `biz`, igual que hace el cliente oficial; con varios botones juntos se usa `mixed`.
+
+---
+
 ## 🖼️ Previsualización de Links *(Actualización 7.0.5)*
 
 `sendLinkPreview` manda solo texto + una tarjeta grande y prolija con la imagen, título y descripción de cualquier URL — igual que un mensaje normal de WhatsApp con link, pero forzando `renderLargerThumbnail` para que se vea mejor. Sirve para links a fotos, artículos, redes sociales, lo que sea.
@@ -591,6 +724,8 @@ await sock.sendMessage(canalJid, { text: 'Novedades de hoy 🎉' })
 - 🚀 Optimizado para mayor velocidad y estabilidad
 - 📸 Mensajes multimedia (imágenes, video, audio, documentos)
 - 🔘 **Botones nativos reales, sin imports sueltos** *(Actualización 7.0.5)*
+- ⚡ **Botones con acción: recordatorio, ubicación y encuesta que responden solos** *(Actualización 7.0.7)*
+- 🧱 **Wrappers de Native Flow: send_location, cta_reminder, webview, catálogo y más** *(Actualización 7.0.7)*
 - 🖼️ **Previsualización automática de links en botones y mensajes** *(Actualización 7.0.5)*
 - 👥 Soporte para grupos y chats privados
 
