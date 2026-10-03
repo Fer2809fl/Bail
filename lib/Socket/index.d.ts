@@ -648,6 +648,6 @@ declare const makeWASocket: (config: UserFacingSocketConfig) => {
       }[]
     | undefined
   >;
-};
+} & import("./native-buttons.js").NativeButtonsApi;
 export default makeWASocket;
 //# sourceMappingURL=index.d.ts.map
