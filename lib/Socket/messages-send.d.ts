@@ -258,74 +258,6 @@ export declare const makeMessagesSocket: (config: SocketConfig) => {
     content: AnyMessageContent,
     options?: MiscMessageGenerationOptions,
   ) => Promise<any>;
-  sendQuickReplyButtons: (
-    jid: string,
-    text: string,
-    replies: { id?: string; text: string }[],
-    extra?: Record<string, any>,
-    options?: MiscMessageGenerationOptions,
-  ) => Promise<any>;
-  sendUrlButton: (
-    jid: string,
-    text: string,
-    buttonText: string,
-    url: string,
-    extra?: Record<string, any>,
-    options?: MiscMessageGenerationOptions,
-  ) => Promise<any>;
-  sendCallButton: (
-    jid: string,
-    text: string,
-    buttonText: string,
-    phoneNumber: string,
-    extra?: Record<string, any>,
-    options?: MiscMessageGenerationOptions,
-  ) => Promise<any>;
-  sendCopyButton: (
-    jid: string,
-    text: string,
-    buttonText: string,
-    copyText: string,
-    extra?: Record<string, any>,
-    options?: MiscMessageGenerationOptions,
-  ) => Promise<any>;
-  sendReminderButton: (
-    jid: string,
-    text: string,
-    buttonText: string,
-    extra?: Record<string, any>,
-    options?: MiscMessageGenerationOptions,
-  ) => Promise<any>;
-  sendListButton: (
-    jid: string,
-    text: string,
-    buttonText: string,
-    sections: {
-      title?: string;
-      rows: {
-        title: string;
-        header?: string;
-        description?: string;
-        id?: string;
-      }[];
-    }[],
-    extra?: Record<string, any>,
-    options?: MiscMessageGenerationOptions,
-  ) => Promise<any>;
-  sendMixedButtons: (
-    jid: string,
-    text: string,
-    rawButtons: { name: string; params: object }[],
-    extra?: Record<string, any>,
-    options?: MiscMessageGenerationOptions,
-  ) => Promise<any>;
-  sendLinkPreview: (
-    jid: string,
-    text: string,
-    url?: string,
-    extra?: Record<string, any>,
-    options?: MiscMessageGenerationOptions,
-  ) => Promise<any>;
   newsletterFetchAllSubscribe: () => Promise<unknown>;
   newsletterMultipleFollow: (jids: string) => Promise<void>;
   newsletterAction: (jid: string, type: string) => Promise<void>;
@@ -661,5 +593,5 @@ export declare const makeMessagesSocket: (config: SocketConfig) => {
       }[]
     | undefined
   >;
-};
+} & import("./native-buttons.js").NativeButtonsApi;
 //# sourceMappingURL=messages-send.d.ts.map
